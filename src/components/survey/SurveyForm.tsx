@@ -47,6 +47,7 @@ export function SurveyForm() {
   const [currentQuestionnaireIndex, setCurrentQuestionnaireIndex] = useState(0)
   const [respostasMap, setRespostasMap] = useState<Record<string, Respostas>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [confirmationCode, setConfirmationCode] = useState('')
 
   const selectedCourse = useMemo(
@@ -69,6 +70,7 @@ export function SurveyForm() {
   }, [])
 
   const handleSubjectToggle = useCallback((subjectId: string) => {
+    setSubmitError('')
     setSelectedSubjectIds((previous) =>
       previous.includes(subjectId)
         ? previous.filter((id) => id !== subjectId)
@@ -103,11 +105,23 @@ export function SurveyForm() {
   const handleSubmit = useCallback(async () => {
     const nextConfirmationCode = generateConfirmationCode()
     setIsSubmitting(true)
+    setSubmitError('')
     const payload = buildSurveyData(nextConfirmationCode)
-    if (payload) await submitSurvey(buildSurveyApiPayload(payload))
-    setConfirmationCode(nextConfirmationCode)
-    setIsSubmitting(false)
-    setCurrentStep('confirmation')
+    if (!payload) {
+      setSubmitError('Não foi possível montar os dados da pesquisa.')
+      setIsSubmitting(false)
+      return
+    }
+
+    try {
+      await submitSurvey(buildSurveyApiPayload(payload))
+      setConfirmationCode(nextConfirmationCode)
+      setCurrentStep('confirmation')
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }, [buildSurveyData])
 
   const resetForm = useCallback(() => {
@@ -119,6 +133,7 @@ export function SurveyForm() {
     setSelectedSubjectIds([])
     setCurrentQuestionnaireIndex(0)
     setRespostasMap({})
+    setSubmitError('')
     setConfirmationCode('')
   }, [])
 
@@ -167,9 +182,10 @@ export function SurveyForm() {
           <QuestionnaireStep
             materia={currentMateria}
             respostas={respostasMap[currentMateria.id] ?? defaultRespostas}
-            onRespostasChange={(respostas) =>
+            onRespostasChange={(respostas) => {
+              setSubmitError('')
               setRespostasMap((previous) => ({ ...previous, [currentMateria.id]: respostas }))
-            }
+            }}
             currentIndex={currentQuestionnaireIndex}
             totalMaterias={selectedMaterias.length}
             onPrevious={() => {
@@ -185,6 +201,7 @@ export function SurveyForm() {
             }}
             isLast={currentQuestionnaireIndex === selectedMaterias.length - 1}
             isSubmitting={isSubmitting}
+            submitError={submitError}
           />
         ) : null}
 

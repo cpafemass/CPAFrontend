@@ -15,6 +15,7 @@ interface QuestionnaireStepProps {
   onNext: () => void
   isLast: boolean
   isSubmitting: boolean
+  submitError: string
 }
 
 export function QuestionnaireStep({
@@ -27,6 +28,7 @@ export function QuestionnaireStep({
   onNext,
   isLast,
   isSubmitting,
+  submitError,
 }: QuestionnaireStepProps) {
   const allFieldsAnswered =
     perguntas.every((pergunta) => respostas[pergunta.id] > 0) &&
@@ -98,6 +100,11 @@ export function QuestionnaireStep({
       </Actions>
       {!allFieldsAnswered ? (
         <p className="mt-4 text-center text-sm font-medium text-slate-500">Responda todas as afirmações e preencha os comentários para continuar</p>
+      ) : null}
+      {submitError ? (
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-center text-sm font-bold text-red-700">
+          {submitError}
+        </p>
       ) : null}
     </section>
   )
