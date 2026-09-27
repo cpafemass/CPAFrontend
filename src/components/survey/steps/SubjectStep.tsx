@@ -1,16 +1,16 @@
-import { useMemo, useState } from 'react'
-import type { Materia } from '../../../lib/survey-types'
-import { Actions } from '../ui/Actions'
-import { Button } from '../ui/Button'
-import { OptionButton } from '../ui/OptionButton'
-import { StepTitle } from '../ui/StepTitle'
+import { useMemo, useState } from "react";
+import type { Materia } from "../../../lib/survey-types";
+import { Actions } from "../ui/Actions";
+import { Button } from "../ui/Button";
+import { OptionButton } from "../ui/OptionButton";
+import { StepTitle } from "../ui/StepTitle";
 
 interface SubjectStepProps {
-  materias: Materia[]
-  selectedSubjectIds: string[]
-  onSubjectToggle: (subjectId: string) => void
-  onNext: () => void
-  onBack: () => void
+  materias: Materia[];
+  selectedSubjectIds: string[];
+  onSubjectToggle: (subjectId: string) => void;
+  onNext: () => void;
+  onBack: () => void;
 }
 
 export function SubjectStep({
@@ -20,20 +20,20 @@ export function SubjectStep({
   onNext,
   onBack,
 }: SubjectStepProps) {
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState("");
 
   const filteredMaterias = useMemo(() => {
-    const query = searchTerm.trim().toLocaleLowerCase('pt-BR')
+    const query = searchTerm.trim().toLocaleLowerCase("pt-BR");
 
-    if (!query) return materias
+    if (!query) return materias;
 
     return materias.filter((materia) => {
-      const nome = materia.nome.toLocaleLowerCase('pt-BR')
-      const docente = materia.docente.toLocaleLowerCase('pt-BR')
+      const nome = materia.nome.toLocaleLowerCase("pt-BR");
+      const docente = materia.docente.toLocaleLowerCase("pt-BR");
 
-      return nome.includes(query) || docente.includes(query)
-    })
-  }, [materias, searchTerm])
+      return nome.includes(query) || docente.includes(query);
+    });
+  }, [materias, searchTerm]);
 
   return (
     <section className="survey-enter w-full max-w-2xl px-4">
@@ -55,24 +55,27 @@ export function SubjectStep({
 
       {selectedSubjectIds.length > 0 ? (
         <div className="mx-auto mb-5 w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">
-          {selectedSubjectIds.length} {selectedSubjectIds.length === 1 ? 'disciplina selecionada' : 'disciplinas selecionadas'}
+          {selectedSubjectIds.length}{" "}
+          {selectedSubjectIds.length === 1
+            ? "disciplina selecionada"
+            : "disciplinas selecionadas"}
         </div>
       ) : null}
 
       <div className="mb-7 grid gap-3">
         {filteredMaterias.map((materia) => {
-          const selected = selectedSubjectIds.includes(materia.id)
+          const selected = selectedSubjectIds.includes(materia.id);
 
           return (
             <OptionButton
-              icon={selected ? 'OK' : 'MAT'}
+              icon={selected ? "OK" : "MAT"}
               key={materia.id}
               selected={selected}
               title={materia.nome}
               subtitle={materia.docente}
               onClick={() => onSubjectToggle(materia.id)}
             />
-          )
+          );
         })}
       </div>
 
@@ -83,9 +86,13 @@ export function SubjectStep({
       ) : null}
 
       <Actions>
-        <Button variant="secondary" onClick={onBack}>Voltar</Button>
-        <Button disabled={selectedSubjectIds.length === 0} onClick={onNext}>Iniciar Questionário</Button>
+        <Button variant="secondary" onClick={onBack}>
+          Voltar
+        </Button>
+        <Button disabled={selectedSubjectIds.length === 0} onClick={onNext}>
+          Iniciar Questionário
+        </Button>
       </Actions>
     </section>
-  )
+  );
 }

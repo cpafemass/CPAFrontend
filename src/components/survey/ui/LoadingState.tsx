@@ -1,5 +1,5 @@
 interface LoadingStateProps {
-  message: string
+  message: string;
 }
 
 export function LoadingState({ message }: LoadingStateProps) {
@@ -12,5 +12,5 @@ export function LoadingState({ message }: LoadingStateProps) {
       <span className="mx-auto mb-3 block h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700" />
       {message}
     </div>
-  )
+  );
 }

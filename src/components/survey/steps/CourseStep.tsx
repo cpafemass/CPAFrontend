@@ -1,19 +1,19 @@
-import type { Curso } from '../../../lib/survey-types'
-import { Actions } from '../ui/Actions'
-import { Button } from '../ui/Button'
-import { LoadingState } from '../ui/LoadingState'
-import { OptionButton } from '../ui/OptionButton'
-import { StepTitle } from '../ui/StepTitle'
+import type { Curso } from "../../../lib/survey-types";
+import { Actions } from "../ui/Actions";
+import { Button } from "../ui/Button";
+import { LoadingState } from "../ui/LoadingState";
+import { OptionButton } from "../ui/OptionButton";
+import { StepTitle } from "../ui/StepTitle";
 
 interface CourseStepProps {
-  cursos: Curso[]
-  selectedCourseId: string | null
-  onCourseSelect: (courseId: Curso['id']) => void
-  isLoading: boolean
-  error: string
-  onRetry: () => void
-  onNext: () => void
-  onBack: () => void
+  cursos: Curso[];
+  selectedCourseId: string | null;
+  onCourseSelect: (courseId: Curso["id"]) => void;
+  isLoading: boolean;
+  error: string;
+  onRetry: () => void;
+  onNext: () => void;
+  onBack: () => void;
 }
 
 export function CourseStep({
@@ -42,7 +42,9 @@ export function CourseStep({
       {error ? (
         <div className="mb-7 rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-bold text-red-700">{error}</p>
-          <Button className="mt-4" onClick={onRetry}>Tentar novamente</Button>
+          <Button className="mt-4" onClick={onRetry}>
+            Tentar novamente
+          </Button>
         </div>
       ) : null}
 
@@ -54,7 +56,7 @@ export function CourseStep({
               key={curso.id}
               selected={selectedCourseId === curso.id}
               title={curso.nome}
-              subtitle={`${curso.materias.length} ${curso.materias.length === 1 ? 'disciplina' : 'disciplinas'} disponíveis`}
+              subtitle={`${curso.materias.length} ${curso.materias.length === 1 ? "disciplina" : "disciplinas"} disponíveis`}
               onClick={() => onCourseSelect(curso.id)}
             />
           ))}
@@ -68,9 +70,16 @@ export function CourseStep({
       ) : null}
 
       <Actions>
-        <Button variant="secondary" onClick={onBack}>Voltar</Button>
-        <Button disabled={!selectedCourseId || isLoading || Boolean(error)} onClick={onNext}>Próximo</Button>
+        <Button variant="secondary" onClick={onBack}>
+          Voltar
+        </Button>
+        <Button
+          disabled={!selectedCourseId || isLoading || Boolean(error)}
+          onClick={onNext}
+        >
+          Próximo
+        </Button>
       </Actions>
     </section>
-  )
+  );
 }

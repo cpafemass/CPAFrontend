@@ -1,292 +1,327 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildDefaultRespostas } from '../../lib/survey-data'
+import { useCallback, useMemo, useState } from "react";
+import { buildSurveyApiPayload } from "../../lib/survey-payload";
 import type {
+  CatalogForm,
   Curso,
-  MateriaResposta,
+  Materia,
   ParticipantType,
-  Pergunta,
   Respostas,
   Step,
-  SurveyData,
-} from '../../lib/survey-types'
-import { buildSurveyApiPayload } from '../../lib/survey-payload'
-import { fetchFormCourses } from '../../services/form-data-api'
-import { fetchQuestions } from '../../services/question-api'
-import { submitSurvey, type SubmitSurveyResult } from '../../services/survey-api'
-import { scrollToTop } from '../../utils/scroll-to-top'
-import { ConfirmationStep } from './steps/ConfirmationStep'
-import { CourseStep } from './steps/CourseStep'
-import { ParticipantStep } from './steps/ParticipantStep'
-import { QuestionnaireStep } from './steps/QuestionnaireStep'
-import { SubjectStep } from './steps/SubjectStep'
-import { SurveyProgress } from './SurveyProgress'
-import { stepLabels } from './survey-steps'
+} from "../../lib/survey-types";
+import { fetchCatalog, fetchFormCourses } from "../../services/catalog-api";
+import {
+  confirmEmailVerification,
+  requestEmailVerification,
+} from "../../services/email-verification-api";
+import {
+  submitSurvey,
+  type SubmitSurveyResult,
+} from "../../services/survey-api";
+import { ConfirmationStep } from "./steps/ConfirmationStep";
+import { CourseStep } from "./steps/CourseStep";
+import {
+  EmailVerificationStep,
+  PinVerificationStep,
+} from "./steps/EmailVerificationStep";
+import { FormSelectionStep } from "./steps/FormSelectionStep";
+import { ParticipantStep } from "./steps/ParticipantStep";
+import { QuestionnaireStep } from "./steps/QuestionnaireStep";
+import { SubjectStep } from "./steps/SubjectStep";
 
-const stepMap: Record<Step, string> = {
-  participant: 'Identificação',
-  course: 'Curso',
-  subjects: 'Disciplinas',
-  questionnaire: 'Avaliação',
-  confirmation: 'Conclusão',
-}
+const emptyResponses = (): Respostas => ({ opcoes: {}, comentario: "" });
 
 export function SurveyForm() {
-  const [currentStep, setCurrentStep] = useState<Step>('participant')
-  const [cpf, setCpf] = useState('')
-  const [matricula, setMatricula] = useState('')
-  const [participantType, setParticipantType] = useState<ParticipantType | null>(null)
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [cursos, setCursos] = useState<Curso[]>([])
-  const [perguntas, setPerguntas] = useState<Pergunta[]>([])
-  const [isLoadingFormData, setIsLoadingFormData] = useState(false)
-  const [formDataError, setFormDataError] = useState('')
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
-  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([])
-  const [currentQuestionnaireIndex, setCurrentQuestionnaireIndex] = useState(0)
-  const [respostasMap, setRespostasMap] = useState<Record<string, Respostas>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState('')
-  const [submitResult, setSubmitResult] = useState<SubmitSurveyResult | null>(null)
+  const [step, setStep] = useState<Step>("participant");
+  const [participantType, setParticipantType] =
+    useState<ParticipantType | null>(null);
+  const [cpf, setCpf] = useState("");
+  const [matricula, setMatricula] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [forms, setForms] = useState<CatalogForm[]>([]);
+  const [form, setForm] = useState<CatalogForm | null>(null);
+  const [loadingForms, setLoadingForms] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [email, setEmail] = useState("");
+  const [verificationId, setVerificationId] = useState<number | null>(null);
+  const [submissionToken, setSubmissionToken] = useState<string | null>(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [courses, setCourses] = useState<Curso[]>([]);
+  const [course, setCourse] = useState<Curso | null>(null);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [subjectIndex, setSubjectIndex] = useState(0);
+  const [responses, setResponses] = useState<Record<string, Respostas>>({});
+  const [generalResponses, setGeneralResponses] = useState(emptyResponses);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState<SubmitSurveyResult | null>(null);
+  const selectedSubjects = useMemo(
+    () =>
+      course?.materias.filter((subject) =>
+        selectedSubjectIds.includes(subject.id),
+      ) ?? [],
+    [course, selectedSubjectIds],
+  );
+  const currentSubject = selectedSubjects[subjectIndex];
 
-  const selectedCourse = useMemo(
-    () => cursos.find((curso) => curso.id === selectedCourseId) ?? null,
-    [cursos, selectedCourseId],
-  )
-
-  const selectedMaterias = useMemo(
-    () => selectedCourse?.materias.filter((materia) => selectedSubjectIds.includes(materia.id)) ?? [],
-    [selectedCourse, selectedSubjectIds],
-  )
-
-  const currentMateria = selectedMaterias[currentQuestionnaireIndex] ?? null
-
-  const goToStep = useCallback((step: Step) => {
-    setCurrentStep(step)
-  }, [])
-
-  useEffect(() => {
-    const animationFrame = window.requestAnimationFrame(() => scrollToTop())
-
-    return () => window.cancelAnimationFrame(animationFrame)
-  }, [currentStep, currentQuestionnaireIndex])
-
-  const loadFormData = useCallback(async () => {
-    setIsLoadingFormData(true)
-    setFormDataError('')
-
+  const loadForms = useCallback(async () => {
+    if (!participantType) return;
+    setLoadingForms(true);
+    setFormError("");
     try {
-      const [nextCursos, nextPerguntas] = await Promise.all([
-        fetchFormCourses(),
-        fetchQuestions(),
-      ])
-      setCursos(nextCursos)
-      setPerguntas(nextPerguntas)
-      setSelectedCourseId((currentCourseId) =>
-        nextCursos.some((curso) => curso.id === currentCourseId) ? currentCourseId : null,
-      )
+      setForms(await fetchCatalog(participantType));
     } catch (error) {
-      setCursos([])
-      setPerguntas([])
-      setSelectedCourseId(null)
-      setSelectedSubjectIds([])
-      setFormDataError(error instanceof Error ? error.message : 'Não foi possível carregar os dados do formulário.')
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar os formulários.",
+      );
     } finally {
-      setIsLoadingFormData(false)
+      setLoadingForms(false);
     }
-  }, [])
-
-  useEffect(() => {
-    void loadFormData()
-  }, [loadFormData])
-
-  const handleCourseSelect = useCallback((courseId: Curso['id']) => {
-    setSelectedCourseId(courseId)
-    setSelectedSubjectIds([])
-    setRespostasMap({})
-    setCurrentQuestionnaireIndex(0)
-    setSubmitResult(null)
-  }, [])
-
-  const handleSubjectToggle = useCallback((subjectId: string) => {
-    setSubmitError('')
-    setSubmitResult(null)
-    setSelectedSubjectIds((previous) =>
-      previous.includes(subjectId)
-        ? previous.filter((id) => id !== subjectId)
-        : [...previous, subjectId],
-    )
-  }, [])
-
-  const canContinueFromParticipant = Boolean(
-    participantType &&
-    acceptedTerms &&
-    cpf.replace(/\D/g, '').length === 11 &&
-    matricula.replace(/\D/g, '').length === 10,
-  )
-
-  const buildSurveyData = useCallback((): SurveyData | null => {
-    if (!selectedCourse || !participantType || !acceptedTerms) return null
-
-    const materias: MateriaResposta[] = selectedMaterias.map((materia) => ({
-      idMateria: materia.id,
-      nomeMateria: materia.nome,
-      docente: materia.docente,
-      respostas: respostasMap[materia.id] ?? buildDefaultRespostas(perguntas),
-    }))
-
-    return {
-      cpf,
-      matricula,
-      participante: participantType,
-      aceiteTermosCondicoesServico: acceptedTerms,
-      curso: {
-        idCurso: selectedCourse.id,
-        nomeCurso: selectedCourse.nome,
-      },
-      perguntas,
-      materias,
-      submittedAt: new Date().toISOString(),
+  }, [participantType]);
+  const participantNext = async () => {
+    await loadForms();
+    setStep("form");
+  };
+  const startForm = async () => {
+    if (!form || !participantType) return;
+    if (participantType !== "aluno" && !submissionToken) {
+      setStep("email");
+      return;
     }
-  }, [acceptedTerms, cpf, matricula, participantType, perguntas, respostasMap, selectedCourse, selectedMaterias])
-
-  const handleSubmit = useCallback(async () => {
-    setIsSubmitting(true)
-    setSubmitError('')
-    setSubmitResult(null)
-
-    const payload = buildSurveyData()
-    if (!payload) {
-      setSubmitResult({
+    if (form.scope === "DISCIPLINA") {
+      try {
+        setCourses(await fetchFormCourses(participantType));
+        setStep("course");
+      } catch (error) {
+        setFormError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar os cursos.",
+        );
+        setStep("form");
+      }
+    } else setStep("questionnaire");
+  };
+  const requestCode = async (value: string) => {
+    if (!form || !participantType || participantType === "aluno") return;
+    setVerificationLoading(true);
+    setVerificationError("");
+    try {
+      setEmail(value);
+      setVerificationId(
+        await requestEmailVerification(value, participantType, form),
+      );
+      setStep("pin");
+    } catch (error) {
+      setVerificationError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível solicitar a verificação.",
+      );
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+  const resend = () => requestCode(email);
+  const confirmCode = async (pin: string) => {
+    if (!verificationId) return;
+    setVerificationLoading(true);
+    setVerificationError("");
+    try {
+      setSubmissionToken(await confirmEmailVerification(verificationId, pin));
+      await startAfterVerification();
+    } catch (error) {
+      setVerificationError(
+        error instanceof Error
+          ? error.message
+          : "Código de verificação inválido ou expirado.",
+      );
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+  const startAfterVerification = async () => {
+    if (!form || !participantType) return;
+    if (form.scope === "DISCIPLINA") {
+      setCourses(await fetchFormCourses(participantType));
+      setStep("course");
+    } else setStep("questionnaire");
+  };
+  const submit = async () => {
+    if (!form || !participantType) return;
+    setIsSubmitting(true);
+    try {
+      setResult(
+        await submitSurvey(
+          buildSurveyApiPayload({
+            form,
+            participantType,
+            acceptedTerms,
+            cpf,
+            matricula,
+            emailVerificationToken: submissionToken,
+            course,
+            subjects: selectedSubjects,
+            responses,
+            generalResponses,
+          }),
+        ),
+      );
+    } catch (error) {
+      setResult({
         ok: false,
         status: 0,
-        message: 'Não foi possível montar os dados da pesquisa.',
-      })
-      goToStep('confirmation')
-      setIsSubmitting(false)
-      return
-    }
-
-    try {
-      const result = await submitSurvey(buildSurveyApiPayload(payload))
-      setSubmitResult(result)
-      goToStep('confirmation')
-    } catch (error) {
-      setSubmitResult({
-        ok: false,
-        status: 0,
-        message: error instanceof Error ? error.message : 'Não foi possível enviar a avaliação.',
-      })
-      goToStep('confirmation')
+        message:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível enviar a avaliação.",
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
+      setStep("confirmation");
     }
-  }, [buildSurveyData, goToStep])
-
-  const resetForm = useCallback(() => {
-    goToStep('participant')
-    setCpf('')
-    setMatricula('')
-    setParticipantType(null)
-    setAcceptedTerms(false)
-    setSelectedCourseId(null)
-    setSelectedSubjectIds([])
-    setCurrentQuestionnaireIndex(0)
-    setRespostasMap({})
-    setSubmitError('')
-    setSubmitResult(null)
-  }, [goToStep])
-
-  const stepNumber = stepLabels.findIndex((label) => label === stepMap[currentStep]) + 1
+  };
+  const reset = () => {
+    setStep("participant");
+    setParticipantType(null);
+    setCpf("");
+    setMatricula("");
+    setAcceptedTerms(false);
+    setForm(null);
+    setSubmissionToken(null);
+    setVerificationId(null);
+    setEmail("");
+    setCourse(null);
+    setSelectedSubjectIds([]);
+    setResponses({});
+    setGeneralResponses(emptyResponses);
+    setResult(null);
+  };
+  const updateSubject = (subject: Materia, value: Respostas) =>
+    setResponses((current) => ({ ...current, [subject.id]: value }));
 
   return (
-    <>
-      {currentStep !== 'confirmation' ? <SurveyProgress currentStep={stepNumber} /> : null}
-
-      <main className="grid flex-1 place-items-center px-0 py-8">
-        {currentStep === 'participant' ? (
-          <ParticipantStep
-            cpf={cpf}
-            matricula={matricula}
-            participantType={participantType}
-            acceptedTerms={acceptedTerms}
-            onCpfChange={setCpf}
-            onMatriculaChange={setMatricula}
-            onParticipantTypeChange={setParticipantType}
-            onAcceptedTermsChange={setAcceptedTerms}
-            onNext={() => {
-              if (canContinueFromParticipant) goToStep('course')
-            }}
-          />
-        ) : null}
-
-        {currentStep === 'course' ? (
-          <CourseStep
-            cursos={cursos}
-            selectedCourseId={selectedCourseId}
-            onCourseSelect={handleCourseSelect}
-            isLoading={isLoadingFormData}
-            error={formDataError}
-            onRetry={() => void loadFormData()}
-            onNext={() => goToStep('subjects')}
-            onBack={() => goToStep('participant')}
-          />
-        ) : null}
-
-        {currentStep === 'subjects' && selectedCourse ? (
-          <SubjectStep
-            materias={selectedCourse.materias}
-            selectedSubjectIds={selectedSubjectIds}
-            onSubjectToggle={handleSubjectToggle}
-            onNext={() => {
-              setCurrentQuestionnaireIndex(0)
-              goToStep('questionnaire')
-            }}
-            onBack={() => goToStep('course')}
-          />
-        ) : null}
-
-        {currentStep === 'questionnaire' && currentMateria ? (
-          <QuestionnaireStep
-            materia={currentMateria}
-            perguntas={perguntas}
-            respostas={respostasMap[currentMateria.id] ?? buildDefaultRespostas(perguntas)}
-            onRespostasChange={(respostas) => {
-              setSubmitError('')
-              setSubmitResult(null)
-              setRespostasMap((previous) => ({ ...previous, [currentMateria.id]: respostas }))
-            }}
-            currentIndex={currentQuestionnaireIndex}
-            totalMaterias={selectedMaterias.length}
-            onPrevious={() => {
-              if (currentQuestionnaireIndex === 0) {
-                goToStep('subjects')
-              } else {
-                setCurrentQuestionnaireIndex((previous) => previous - 1)
-              }
-            }}
-            onNext={() => {
-              if (currentQuestionnaireIndex < selectedMaterias.length - 1) {
-                setCurrentQuestionnaireIndex((previous) => previous + 1)
-              } else {
-                void handleSubmit()
-              }
-            }}
-            isLast={currentQuestionnaireIndex === selectedMaterias.length - 1}
-            isSubmitting={isSubmitting}
-            submitError={submitError}
-          />
-        ) : null}
-
-        {currentStep === 'confirmation' ? (
-          <ConfirmationStep
-            cpf={cpf}
-            matricula={matricula}
-            submitResult={submitResult}
-            totalMaterias={selectedMaterias.length}
-            onNewResponse={resetForm}
-          />
-        ) : null}
-      </main>
-    </>
-  )
+    <main className="grid flex-1 place-items-center py-6 sm:py-10">
+      {step === "participant" ? (
+        <ParticipantStep
+          cpf={cpf}
+          matricula={matricula}
+          participantType={participantType}
+          acceptedTerms={acceptedTerms}
+          onCpfChange={setCpf}
+          onMatriculaChange={setMatricula}
+          onParticipantTypeChange={setParticipantType}
+          onAcceptedTermsChange={setAcceptedTerms}
+          onNext={() => void participantNext()}
+        />
+      ) : null}
+      {step === "form" ? (
+        <FormSelectionStep
+          forms={forms}
+          selected={form}
+          loading={loadingForms}
+          error={formError}
+          onSelect={setForm}
+          onRetry={() => void loadForms()}
+          onBack={() => setStep("participant")}
+          onNext={() => void startForm()}
+        />
+      ) : null}
+      {step === "email" ? (
+        <EmailVerificationStep
+          loading={verificationLoading}
+          error={verificationError}
+          onBack={() => setStep("form")}
+          onSubmit={requestCode}
+        />
+      ) : null}
+      {step === "pin" ? (
+        <PinVerificationStep
+          loading={verificationLoading}
+          error={verificationError}
+          onBack={() => setStep("email")}
+          onConfirm={confirmCode}
+          onResend={resend}
+        />
+      ) : null}
+      {step === "course" ? (
+        <CourseStep
+          cursos={courses}
+          selectedCourseId={course?.id ?? null}
+          onCourseSelect={(id) => {
+            setCourse(courses.find((item) => item.id === id) ?? null);
+            setSelectedSubjectIds([]);
+          }}
+          isLoading={false}
+          error=""
+          onRetry={() => undefined}
+          onBack={() => setStep("form")}
+          onNext={() => setStep("subjects")}
+        />
+      ) : null}
+      {step === "subjects" && course ? (
+        <SubjectStep
+          materias={course.materias}
+          selectedSubjectIds={selectedSubjectIds}
+          onSubjectToggle={(id) =>
+            setSelectedSubjectIds((current) =>
+              current.includes(id)
+                ? current.filter((value) => value !== id)
+                : [...current, id],
+            )
+          }
+          onBack={() => setStep("course")}
+          onNext={() => {
+            setSubjectIndex(0);
+            setStep("questionnaire");
+          }}
+        />
+      ) : null}
+      {step === "questionnaire" && form ? (
+        <QuestionnaireStep
+          form={form}
+          materia={form.scope === "DISCIPLINA" ? currentSubject : undefined}
+          respostas={
+            form.scope === "DISCIPLINA" && currentSubject
+              ? (responses[currentSubject.id] ?? emptyResponses())
+              : generalResponses
+          }
+          onChange={(value) =>
+            currentSubject && form.scope === "DISCIPLINA"
+              ? updateSubject(currentSubject, value)
+              : setGeneralResponses(value)
+          }
+          onBack={() =>
+            form.scope === "DISCIPLINA"
+              ? subjectIndex
+                ? setSubjectIndex(subjectIndex - 1)
+                : setStep("subjects")
+              : setStep(participantType === "aluno" ? "form" : "pin")
+          }
+          onNext={() => {
+            if (
+              form.scope === "DISCIPLINA" &&
+              subjectIndex < selectedSubjects.length - 1
+            )
+              setSubjectIndex(subjectIndex + 1);
+            else void submit();
+          }}
+          isSubmitting={isSubmitting}
+          isLast={
+            form.scope !== "DISCIPLINA" ||
+            subjectIndex === selectedSubjects.length - 1
+          }
+        />
+      ) : null}
+      {step === "confirmation" ? (
+        <ConfirmationStep
+          participantType={participantType}
+          submitResult={result}
+          totalMaterias={selectedSubjects.length}
+          onNewResponse={reset}
+        />
+      ) : null}
+    </main>
+  );
 }
