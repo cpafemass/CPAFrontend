@@ -208,6 +208,7 @@ export function SurveyForm() {
   const submit = async () => {
     if (!form || !participantType) return;
     setIsSubmitting(true);
+    let advancesToNextForm = false;
     try {
       const submission = await submitSurvey(
         buildSurveyApiPayload({
@@ -224,6 +225,7 @@ export function SurveyForm() {
         }),
       );
       if (submission.ok && nextForm) {
+        advancesToNextForm = true;
         setForm(nextForm);
         resetAnswersForForm();
         setResult(null);
@@ -254,7 +256,7 @@ export function SurveyForm() {
       });
     } finally {
       setIsSubmitting(false);
-      setStep("confirmation");
+      if (!advancesToNextForm) setStep("confirmation");
     }
   };
   const reset = () => {
