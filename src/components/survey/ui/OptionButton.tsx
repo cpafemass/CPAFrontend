@@ -19,7 +19,7 @@ export function OptionButton({
   return (
     <button
       className={cx(
-        'flex w-full items-center gap-4 rounded-lg border bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-slate-900/10',
+        'flex w-full items-center gap-3 rounded-xl border bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-slate-900/10 sm:gap-4 sm:p-5',
         selected
           ? 'border-blue-700 bg-blue-50 ring-4 ring-blue-700/10'
           : 'border-slate-200',
@@ -29,7 +29,7 @@ export function OptionButton({
     >
       <IconBadge tone={selected ? 'primary' : 'soft'}>{icon}</IconBadge>
       <span className="grid flex-1 gap-1">
-        <strong className="text-lg text-slate-950">{title}</strong>
+        <strong className="text-base text-slate-950 sm:text-lg">{title}</strong>
         {subtitle ? <small className="font-medium text-slate-500">{subtitle}</small> : null}
       </span>
       <span
