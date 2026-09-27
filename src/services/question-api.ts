@@ -7,6 +7,7 @@ const QUESTION_API_ENDPOINT = buildApiEndpoint('/perguntas')
 interface ApiQuestion {
   id: string
   texto: string
+  options?: Array<{ code: string; label: string; naoSeiResponder?: boolean }>
 }
 
 interface ApiErrorResponse {
@@ -30,6 +31,7 @@ function mapApiQuestion(apiQuestion: ApiQuestion): Pergunta {
   return {
     id: apiQuestion.id,
     texto: apiQuestion.texto,
+    options: apiQuestion.options ?? [],
   }
 }
 

@@ -13,7 +13,7 @@ export const textoIntrodutorioAvaliacao =
 
 export function buildDefaultRespostas(perguntas: Pergunta[]): Respostas {
   return {
-    notas: Object.fromEntries(perguntas.map((pergunta) => [pergunta.id, 0])),
+    opcoes: Object.fromEntries(perguntas.map((pergunta) => [pergunta.id, ''])),
     comentario: '',
   }
 }

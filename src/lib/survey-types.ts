@@ -1,79 +1,50 @@
-export type ParticipantType = 'estudante' | 'docente'
+export type ParticipantType = 'aluno' | 'professor' | 'funcionario'
 
 export type QuestionId = string
+export type FormScope = 'DISCIPLINA' | 'GERAL'
+
+export interface CatalogOption {
+  code: string
+  label: string
+  naoSeiResponder?: boolean
+}
 
 export interface Pergunta {
   id: QuestionId
   texto: string
+  ordem?: number
+  options: CatalogOption[]
 }
 
-export interface Materia {
-  id: string
-  nome: string
-  docente: string
+export interface CatalogForm {
+  campaign: string
+  code: string
+  name: string
+  audience: ParticipantType
+  version: number
+  order: number
+  scope: FormScope
+  commentAllowed: boolean
+  commentNotice?: string
+  questions: Pergunta[]
 }
 
-export interface Curso {
-  id: string
-  nome: string
-  materias: Materia[]
-}
-
-export interface Respostas {
-  notas: Record<QuestionId, number>
-  comentario: string
-}
-
-export interface MateriaResposta {
-  idMateria: string
-  nomeMateria: string
-  docente: string
-  respostas: Respostas
-}
-
-export interface SurveyData {
-  cpf: string
-  matricula: string
-  participante: ParticipantType
-  aceiteTermosCondicoesServico: boolean
-  curso: {
-    idCurso: string
-    nomeCurso: string
-  }
-  perguntas: Pergunta[]
-  materias: MateriaResposta[]
-  submittedAt: string
-}
-
-export interface SurveyApiAnswer {
-  questionId: QuestionId
-  questionText: string
-  score: number
-  scoreLabel: string
-}
-
-export interface SurveyApiSubject {
-  subjectId: string
-  subjectName: string
-  teacherName: string
-  answers: SurveyApiAnswer[]
-  comment: string
-}
+export interface Materia { id: string; nome: string; docente: string }
+export interface Curso { id: string; nome: string; materias: Materia[] }
+export interface Respostas { opcoes: Record<QuestionId, string>; comentario: string }
+export interface SurveyApiAnswer { questionId: QuestionId; optionCode: string }
+export interface SurveyApiSubject { subjectId: string; subjectName: string; teacherName: string; answers: SurveyApiAnswer[]; comment?: string }
 
 export interface SurveyApiPayload {
-  schemaVersion: '2026-CPA-v1'
+  campaign: string
+  form: string
+  formVersion: number
   submittedAt: string
-  respondent: {
-    cpf: string
-    matricula: string
-    type: ParticipantType
-    aceiteTermosCondicoesServico: boolean
-  }
-  course: {
-    id: string
-    name: string
-  }
-  subjects: SurveyApiSubject[]
+  respondent: { type: ParticipantType; aceiteTermosCondicoesServico: boolean; cpf?: string; matricula?: string; emailVerificationToken?: string }
+  course?: { id?: string; name: string }
+  subjects?: SurveyApiSubject[]
+  answers?: SurveyApiAnswer[]
+  comment?: string
 }
 
-export type Step = 'participant' | 'course' | 'subjects' | 'questionnaire' | 'confirmation'
+export type Step = 'participant' | 'form' | 'email' | 'pin' | 'course' | 'subjects' | 'questionnaire' | 'confirmation'
