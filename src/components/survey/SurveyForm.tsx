@@ -301,26 +301,16 @@ export function SurveyForm() {
       return;
     }
     setResult(null);
-    const catalog = await loadForms();
-    if (!catalog?.length) {
-      setStep("participant");
-      setParticipantType(null);
-      setAcceptedTerms(false);
-      setForm(null);
-      setForms([]);
-      clearAfterConfirmation();
-      setCompletedScopes([]);
-      setLastCompletedSubjects(0);
-      setFormError("Não há mais formulários disponíveis para esta sessão.");
-      return;
-    }
+    setFormError("");
     clearAfterConfirmation();
+    setCompletedScopes([]);
+    setLastCompletedSubjects(0);
     if (participantType === "aluno") {
       setForm(null);
       setStep("form");
       return;
     }
-    setForm(catalog[0]);
+    setForm(forms[0] ?? null);
     setStep("email");
   };
   const reset = () => {

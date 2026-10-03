@@ -175,10 +175,8 @@ describe('SurveyForm', () => {
     consoleError.mockRestore()
   })
 
-  it('re-checks available scopes before starting a new response from confirmation', async () => {
-    vi.mocked(fetchCatalog)
-      .mockResolvedValueOnce([studentForm])
-      .mockResolvedValueOnce([])
+  it('starts a new response from cached catalog instead of re-fetching progress state', async () => {
+    vi.mocked(fetchCatalog).mockResolvedValueOnce([studentForm])
 
     render(<SurveyForm />)
     continueFromParticipant('Estudante')
@@ -190,7 +188,7 @@ describe('SurveyForm', () => {
     await screen.findByRole('heading', { name: 'Avaliação enviada' })
     fireEvent.click(screen.getByRole('button', { name: 'Nova resposta' }))
 
-    await screen.findByText('Não há mais formulários disponíveis para esta sessão.')
-    expect(screen.getByRole('button', { name: 'Continuar' })).not.toBeNull()
+    expect(await screen.findByRole('button', { name: /^Avaliação discente/ })).not.toBeNull()
+    expect(vi.mocked(fetchCatalog)).toHaveBeenCalledTimes(1)
   })
 })
