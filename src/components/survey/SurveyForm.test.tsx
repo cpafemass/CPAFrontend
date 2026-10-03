@@ -1,0 +1,143 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CatalogForm } from '../../lib/survey-types'
+import { fetchCatalog, fetchFormCourses } from '../../services/catalog-api'
+import {
+  confirmEmailVerification,
+  requestEmailVerification,
+} from '../../services/email-verification-api'
+import { submitSurvey } from '../../services/survey-api'
+import { SurveyForm } from './SurveyForm'
+
+vi.mock('../../services/catalog-api', () => ({
+  fetchCatalog: vi.fn(),
+  fetchFormCourses: vi.fn(),
+}))
+vi.mock('../../services/email-verification-api', () => ({
+  confirmEmailVerification: vi.fn(),
+  requestEmailVerification: vi.fn(),
+}))
+vi.mock('../../services/survey-api', () => ({ submitSurvey: vi.fn() }))
+
+const baseForm: Omit<CatalogForm, 'audience' | 'code' | 'name'> = {
+  campaign: 'cpa-2026',
+  version: 1,
+  order: 1,
+  scope: 'GERAL',
+  commentAllowed: false,
+  questions: [
+    {
+      id: 'q1',
+      texto: 'A avaliação foi satisfatória?',
+      options: [{ code: 'sim', label: 'Sim' }],
+    },
+  ],
+}
+
+const studentForm: CatalogForm = {
+  ...baseForm,
+  code: 'discente_gestao',
+  name: 'Avaliação discente',
+  audience: 'aluno',
+}
+
+const staffForm: CatalogForm = {
+  ...baseForm,
+  code: 'docente_gestao',
+  name: 'Avaliação docente',
+  audience: 'professor',
+}
+
+beforeEach(() => {
+  vi.mocked(fetchCatalog).mockImplementation(async (participantType) =>
+    participantType === 'aluno' ? [studentForm] : [staffForm],
+  )
+  vi.mocked(fetchFormCourses).mockResolvedValue([])
+  vi.mocked(requestEmailVerification).mockResolvedValue({ verificationId: 7 })
+  vi.mocked(confirmEmailVerification).mockResolvedValue({
+    submissionToken: 'opaque-proof',
+  })
+  vi.mocked(submitSurvey).mockResolvedValue({
+    ok: true,
+    status: 200,
+    message: 'Avaliação enviada com sucesso.',
+  })
+})
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
+
+function continueFromParticipant(roleName: string) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${roleName}`) }))
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+}
+
+describe('SurveyForm', () => {
+  it('keeps student submissions anonymous and blocks a double submission', async () => {
+    let resolveSubmission: () => void = () => undefined
+    vi.mocked(submitSurvey).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSubmission = () =>
+            resolve({
+              ok: true,
+              status: 200,
+              message: 'Avaliação enviada com sucesso.',
+            })
+        }),
+    )
+    render(<SurveyForm />)
+
+    continueFromParticipant('Estudante')
+    expect(screen.queryByLabelText('CPF')).toBeNull()
+    expect(screen.queryByLabelText('Matrícula')).toBeNull()
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Avaliação discente/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sim' }))
+
+    const finish = screen.getByRole('button', { name: 'Finalizar Pesquisa' })
+    fireEvent.click(finish)
+    fireEvent.click(finish)
+
+    await waitFor(() => expect(submitSurvey).toHaveBeenCalledTimes(1))
+    const payload = vi.mocked(submitSurvey).mock.calls[0][0]
+    expect(payload.respondent).toEqual({
+      type: 'aluno',
+      aceiteTermosCondicoesServico: true,
+    })
+    resolveSubmission()
+    await screen.findByRole('heading', { name: 'Avaliação enviada' })
+  })
+
+  it('submits the staff category and opaque proof without e-mail or PIN', async () => {
+    render(<SurveyForm />)
+
+    continueFromParticipant('Docente')
+    fireEvent.change(await screen.findByLabelText('E-mail institucional'), {
+      target: { value: 'docente@femass.edu.br' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    fireEvent.change(await screen.findByLabelText('Código'), {
+      target: { value: 'PIN-SECRETO' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar código' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sim' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar Pesquisa' }))
+
+    await waitFor(() => expect(submitSurvey).toHaveBeenCalledTimes(1))
+    expect(requestEmailVerification).toHaveBeenCalledWith(
+      'docente@femass.edu.br',
+      'professor',
+      staffForm,
+    )
+    expect(confirmEmailVerification).toHaveBeenCalledWith(7, 'PIN-SECRETO')
+    expect(vi.mocked(submitSurvey).mock.calls[0][0].respondent).toEqual({
+      type: 'professor',
+      aceiteTermosCondicoesServico: true,
+      emailVerificationToken: 'opaque-proof',
+    })
+  })
+})

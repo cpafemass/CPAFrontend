@@ -15,17 +15,16 @@ function answersFor(form: CatalogForm, respostas: Respostas): SurveyApiAnswer[] 
 }
 
 interface BuildPayloadInput {
-  form: CatalogForm; participantType: ParticipantType; acceptedTerms: boolean; cpf: string; matricula: string
+  form: CatalogForm; participantType: ParticipantType; acceptedTerms: boolean
   emailVerificationToken: string | null; course: Curso | null; subjects: Materia[]
   responses: Record<string, Respostas>; generalResponses: Respostas
 }
 
 export function buildSurveyApiPayload(input: BuildPayloadInput): SurveyApiPayload {
   const respondent: SurveyApiPayload['respondent'] = { type: input.participantType, aceiteTermosCondicoesServico: input.acceptedTerms }
-  if (input.participantType === 'aluno') {
-    respondent.cpf = input.cpf.replace(/\D/g, '')
-    respondent.matricula = input.matricula.trim()
-  } else if (input.emailVerificationToken) respondent.emailVerificationToken = input.emailVerificationToken
+  if (input.participantType !== 'aluno' && input.emailVerificationToken) {
+    respondent.emailVerificationToken = input.emailVerificationToken
+  }
   const payload: SurveyApiPayload = { campaign: input.form.campaign, form: input.form.code, formVersion: input.form.version, submittedAt: new Date().toISOString(), respondent }
   if (input.form.scope === 'DISCIPLINA' && input.course) {
     payload.course = { id: input.course.id, name: input.course.nome }

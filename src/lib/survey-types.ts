@@ -41,12 +41,19 @@ export interface Respostas { opcoes: Record<QuestionId, string>; comentario: str
 export interface SurveyApiAnswer { questionId: QuestionId; optionCode: string }
 export interface SurveyApiSubject { subjectId: string; subjectName: string; teacherName: string; answers: SurveyApiAnswer[]; comment?: string }
 
+export interface SurveyRespondent {
+  type: ParticipantType
+  aceiteTermosCondicoesServico: boolean
+  /** Comprovante opaco emitido após a confirmação do PIN institucional. */
+  emailVerificationToken?: string
+}
+
 export interface SurveyApiPayload {
   campaign: string
   form: string
   formVersion: number
   submittedAt: string
-  respondent: { type: ParticipantType; aceiteTermosCondicoesServico: boolean; cpf?: string; matricula?: string; emailVerificationToken?: string }
+  respondent: SurveyRespondent
   course?: { id?: string; name: string }
   subjects?: SurveyApiSubject[]
   answers?: SurveyApiAnswer[]

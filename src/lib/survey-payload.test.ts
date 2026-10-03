@@ -40,8 +40,6 @@ describe('buildSurveyApiPayload', () => {
       form,
       participantType: 'aluno',
       acceptedTerms: true,
-      cpf: '529.982.247-25',
-      matricula: ' A-01 ',
       emailVerificationToken: null,
       course: null,
       subjects: [],
@@ -61,10 +59,33 @@ describe('buildSurveyApiPayload', () => {
       form: 'discente_gestao',
       formVersion: 3,
       comment: 'Comentário livre',
-      respondent: { cpf: '52998224725', matricula: 'A-01' },
+      respondent: { type: 'aluno', aceiteTermosCondicoesServico: true },
     })
     expect(payload.answers).toEqual([
       { questionId: 'q-obrigatoria', optionCode: 'nao_sei_responder' },
     ])
+  })
+
+  it('sends only an opaque verification proof for staff respondents', () => {
+    const payload = buildSurveyApiPayload({
+      form: { ...form, audience: 'professor' },
+      participantType: 'professor',
+      acceptedTerms: true,
+      emailVerificationToken: 'opaque-proof',
+      course: null,
+      subjects: [],
+      responses: {},
+      generalResponses: { opcoes: { 'q-obrigatoria': 'nao_sei_responder' }, comentario: '' },
+    })
+
+    expect(payload.respondent).toEqual({
+      type: 'professor',
+      aceiteTermosCondicoesServico: true,
+      emailVerificationToken: 'opaque-proof',
+    })
+    expect(payload.respondent).not.toHaveProperty('email')
+    expect(payload.respondent).not.toHaveProperty('pin')
+    expect(payload.respondent).not.toHaveProperty('cpf')
+    expect(payload.respondent).not.toHaveProperty('matricula')
   })
 })

@@ -7,16 +7,12 @@ const SURVEY_API_ENDPOINT = buildApiEndpoint('/formulario')
 interface ApiSubmitResponse {
   error?: string
   message?: string
-  qrCode?: string
-  hash?: string
 }
 
 export interface SubmitSurveyResult {
   ok: boolean
   status: number
   message: string
-  qrCodeValue?: string
-  validationCode?: string
 }
 
 async function readJsonOrText(response: Response) {
@@ -38,12 +34,13 @@ export async function submitSurvey(payload: SurveyApiPayload): Promise<SubmitSur
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      retries: 1,
     })
   } catch {
     return {
       ok: false,
       status: 0,
-      message: 'Não foi possível conectar ao backend após 3 tentativas.',
+      message: 'Não foi possível conectar ao backend. A resposta não foi reenviada automaticamente para evitar duplicidade.',
     }
   }
 
@@ -55,8 +52,6 @@ export async function submitSurvey(payload: SurveyApiPayload): Promise<SubmitSur
       ok: true,
       status: response.status,
       message: responseMessage || 'Avaliação enviada com sucesso.',
-      qrCodeValue: responseBody?.qrCode ?? responseBody?.hash,
-      validationCode: responseBody?.hash ?? responseBody?.qrCode,
     }
   }
 
