@@ -36,4 +36,47 @@ describe('submitSurvey', () => {
     await expect(submitSurvey(payload)).resolves.toMatchObject({ ok: false, status: 0 })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('sanitizes backend errors and does not expose raw sensitive payloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'CPF 00011122233, token segredo' }), {
+          status: 400,
+        }),
+      ),
+    )
+
+    await expect(submitSurvey(payload)).resolves.toEqual({
+      ok: false,
+      status: 400,
+      message: 'Não foi possível enviar a avaliação.',
+    })
+  })
+
+  it('treats the backend proof as opaque and prefers QR over text when both are present', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            message: 'ok',
+            receipt: 'opaque-token',
+            qrCode: 'data:image/png;base64,abc',
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    await expect(submitSurvey(payload)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      message: 'Avaliação enviada com sucesso.',
+      proof: {
+        kind: 'qr',
+        value: 'data:image/png;base64,abc',
+      },
+    })
+  })
 })

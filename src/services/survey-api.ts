@@ -7,12 +7,24 @@ const SURVEY_API_ENDPOINT = buildApiEndpoint('/formulario')
 interface ApiSubmitResponse {
   error?: string
   message?: string
+  receipt?: string
+  comprovante?: string
+  validationCode?: string
+  hash?: string
+  qrCode?: string
+  qrcode?: string
+}
+
+export interface SubmitSurveyProof {
+  kind: 'text' | 'qr'
+  value: string
 }
 
 export interface SubmitSurveyResult {
   ok: boolean
   status: number
   message: string
+  proof?: SubmitSurveyProof
 }
 
 async function readJsonOrText(response: Response) {
@@ -24,6 +36,22 @@ async function readJsonOrText(response: Response) {
   } catch {
     return { message: responseText } satisfies ApiSubmitResponse
   }
+}
+
+function normalizedProof(
+  responseBody: ApiSubmitResponse | null,
+): SubmitSurveyProof | undefined {
+  if (!responseBody) return undefined
+  const qrCode = (responseBody.qrCode ?? responseBody.qrcode)?.trim()
+  if (qrCode) return { kind: 'qr', value: qrCode }
+  const token = (
+    responseBody.receipt ??
+    responseBody.comprovante ??
+    responseBody.validationCode ??
+    responseBody.hash
+  )?.trim()
+  if (!token) return undefined
+  return { kind: 'text', value: token }
 }
 
 export async function submitSurvey(payload: SurveyApiPayload): Promise<SubmitSurveyResult> {
@@ -45,19 +73,19 @@ export async function submitSurvey(payload: SurveyApiPayload): Promise<SubmitSur
   }
 
   const responseBody = await readJsonOrText(response)
-  const responseMessage = responseBody?.error ?? responseBody?.message
 
   if (response.ok) {
     return {
       ok: true,
       status: response.status,
-      message: responseMessage || 'Avaliação enviada com sucesso.',
+      message: 'Avaliação enviada com sucesso.',
+      proof: normalizedProof(responseBody),
     }
   }
 
   return {
     ok: false,
     status: response.status,
-    message: responseMessage || 'Não foi possível enviar a avaliação.',
+    message: 'Não foi possível enviar a avaliação.',
   }
 }

@@ -54,6 +54,8 @@ export function SurveyForm() {
   const [generalResponses, setGeneralResponses] = useState(emptyResponses);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitSurveyResult | null>(null);
+  const [completedScopes, setCompletedScopes] = useState<string[]>([]);
+  const [lastCompletedSubjects, setLastCompletedSubjects] = useState(0);
   const requestInFlight = useRef(false);
   const confirmationInFlight = useRef(false);
   const submissionInFlight = useRef(false);
@@ -124,6 +126,11 @@ export function SurveyForm() {
     setSubjectIndex(0);
     setResponses({});
     setGeneralResponses(emptyResponses);
+  };
+  const clearAfterConfirmation = () => {
+    clearVerification();
+    resetAnswersForForm();
+    setEmailVerificationToken(null);
   };
   const selectParticipantType = (value: ParticipantType) => {
     if (value !== participantType) {
@@ -238,6 +245,8 @@ export function SurveyForm() {
         }),
       );
       if (submission.ok && nextForm) {
+        setCompletedScopes((current) => [...current, form.name]);
+        setLastCompletedSubjects(selectedSubjects.length);
         advancesToNextForm = true;
         setForm(nextForm);
         resetAnswersForForm();
@@ -266,21 +275,43 @@ export function SurveyForm() {
         setStep("form");
         return;
       }
+      if (submission.ok) {
+        setCompletedScopes((current) => [...current, form.name]);
+        setLastCompletedSubjects(selectedSubjects.length);
+      }
       setResult(submission);
-    } catch (error) {
+    } catch {
       setResult({
         ok: false,
         status: 0,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Não foi possível enviar a avaliação.",
+        message: "Não foi possível enviar a avaliação.",
       });
     } finally {
       submissionInFlight.current = false;
       setIsSubmitting(false);
-      if (!advancesToNextForm && shouldShowConfirmation) setStep("confirmation");
+      if (!advancesToNextForm && shouldShowConfirmation) {
+        clearAfterConfirmation();
+        setStep("confirmation");
+      }
     }
+  };
+  const newResponse = async () => {
+    if (!participantType) {
+      reset();
+      return;
+    }
+    setResult(null);
+    setFormError("");
+    clearAfterConfirmation();
+    setCompletedScopes([]);
+    setLastCompletedSubjects(0);
+    if (participantType === "aluno") {
+      setForm(null);
+      setStep("form");
+      return;
+    }
+    setForm(forms[0] ?? null);
+    setStep("email");
   };
   const reset = () => {
     setStep("participant");
@@ -294,6 +325,8 @@ export function SurveyForm() {
     setResponses({});
     setGeneralResponses(emptyResponses);
     setResult(null);
+    setCompletedScopes([]);
+    setLastCompletedSubjects(0);
   };
   const updateSubject = (subject: Materia, value: Respostas) =>
     setResponses((current) => ({ ...current, [subject.id]: value }));
@@ -423,10 +456,10 @@ export function SurveyForm() {
       ) : null}
       {step === "confirmation" ? (
         <ConfirmationStep
-          participantType={participantType}
           submitResult={result}
-          totalMaterias={selectedSubjects.length}
-          onNewResponse={reset}
+          completedScopes={completedScopes}
+          lastCompletedSubjects={lastCompletedSubjects}
+          onNewResponse={() => void newResponse()}
         />
       ) : null}
     </main>
