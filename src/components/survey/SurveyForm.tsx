@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { buildSurveyApiPayload } from "../../lib/survey-payload";
 import type {
   CatalogForm,
@@ -34,8 +34,6 @@ export function SurveyForm() {
   const [step, setStep] = useState<Step>("participant");
   const [participantType, setParticipantType] =
     useState<ParticipantType | null>(null);
-  const [cpf, setCpf] = useState("");
-  const [matricula, setMatricula] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [forms, setForms] = useState<CatalogForm[]>([]);
   const [form, setForm] = useState<CatalogForm | null>(null);
@@ -43,7 +41,9 @@ export function SurveyForm() {
   const [formError, setFormError] = useState("");
   const [email, setEmail] = useState("");
   const [verificationId, setVerificationId] = useState<number | null>(null);
-  const [submissionToken, setSubmissionToken] = useState<string | null>(null);
+  const [emailVerificationToken, setEmailVerificationToken] = useState<
+    string | null
+  >(null);
   const [verificationError, setVerificationError] = useState("");
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [courses, setCourses] = useState<Curso[]>([]);
@@ -54,6 +54,9 @@ export function SurveyForm() {
   const [generalResponses, setGeneralResponses] = useState(emptyResponses);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitSurveyResult | null>(null);
+  const requestInFlight = useRef(false);
+  const confirmationInFlight = useRef(false);
+  const submissionInFlight = useRef(false);
   const selectedSubjects = useMemo(
     () =>
       course?.materias.filter((subject) =>
@@ -73,6 +76,13 @@ export function SurveyForm() {
     isStaffJourney && currentFormIndex >= 0
       ? forms[currentFormIndex + 1]
       : undefined;
+
+  const clearVerification = () => {
+    setEmail("");
+    setVerificationId(null);
+    setEmailVerificationToken(null);
+    setVerificationError("");
+  };
 
   const loadForms = useCallback(async () => {
     if (!participantType) return;
@@ -115,9 +125,19 @@ export function SurveyForm() {
     setResponses({});
     setGeneralResponses(emptyResponses);
   };
+  const selectParticipantType = (value: ParticipantType) => {
+    if (value !== participantType) {
+      clearVerification();
+      setForms([]);
+      setForm(null);
+      setFormError("");
+      resetAnswersForForm();
+    }
+    setParticipantType(value);
+  };
   const startForm = async (verified = false) => {
     if (!form || !participantType) return;
-    if (participantType !== "aluno" && !submissionToken && !verified) {
+    if (participantType !== "aluno" && !emailVerificationToken && !verified) {
       setStep("email");
       return;
     }
@@ -137,14 +157,25 @@ export function SurveyForm() {
     } else setStep("questionnaire");
   };
   const requestCode = async (value: string) => {
-    if (!form || !participantType || participantType === "aluno") return;
+    if (
+      requestInFlight.current ||
+      !form ||
+      !participantType ||
+      participantType === "aluno"
+    )
+      return;
+    requestInFlight.current = true;
+    const nextEmail = value.trim();
+    clearVerification();
+    setEmail(nextEmail);
     setVerificationLoading(true);
-    setVerificationError("");
     try {
-      setEmail(value);
-      setVerificationId(
-        await requestEmailVerification(value, participantType, form),
+      const response = await requestEmailVerification(
+        nextEmail,
+        participantType,
+        form,
       );
+      setVerificationId(response.verificationId);
       setStep("pin");
     } catch (error) {
       setVerificationError(
@@ -153,16 +184,21 @@ export function SurveyForm() {
           : "Não foi possível solicitar a verificação.",
       );
     } finally {
+      requestInFlight.current = false;
       setVerificationLoading(false);
     }
   };
   const resend = () => requestCode(email);
   const confirmCode = async (pin: string) => {
-    if (!verificationId) return;
+    if (confirmationInFlight.current || !verificationId) return;
+    confirmationInFlight.current = true;
     setVerificationLoading(true);
     setVerificationError("");
     try {
-      setSubmissionToken(await confirmEmailVerification(verificationId, pin));
+      const response = await confirmEmailVerification(verificationId, pin);
+      setEmailVerificationToken(response.submissionToken);
+      setVerificationId(null);
+      setEmail("");
       await startAfterVerification();
     } catch (error) {
       setVerificationError(
@@ -171,14 +207,20 @@ export function SurveyForm() {
           : "Código de verificação inválido ou expirado.",
       );
     } finally {
+      confirmationInFlight.current = false;
       setVerificationLoading(false);
     }
   };
   const startAfterVerification = async () => {
     await startForm(true);
   };
+  const restartEmailVerification = () => {
+    clearVerification();
+    setStep("email");
+  };
   const submit = async () => {
-    if (!form || !participantType) return;
+    if (submissionInFlight.current || !form || !participantType) return;
+    submissionInFlight.current = true;
     setIsSubmitting(true);
     let advancesToNextForm = false;
     let shouldShowConfirmation = true;
@@ -188,9 +230,7 @@ export function SurveyForm() {
           form,
           participantType,
           acceptedTerms,
-          cpf,
-          matricula,
-          emailVerificationToken: submissionToken,
+          emailVerificationToken,
           course,
           subjects: selectedSubjects,
           responses,
@@ -237,6 +277,7 @@ export function SurveyForm() {
             : "Não foi possível enviar a avaliação.",
       });
     } finally {
+      submissionInFlight.current = false;
       setIsSubmitting(false);
       if (!advancesToNextForm && shouldShowConfirmation) setStep("confirmation");
     }
@@ -244,14 +285,10 @@ export function SurveyForm() {
   const reset = () => {
     setStep("participant");
     setParticipantType(null);
-    setCpf("");
-    setMatricula("");
     setAcceptedTerms(false);
     setForm(null);
     setForms([]);
-    setSubmissionToken(null);
-    setVerificationId(null);
-    setEmail("");
+    clearVerification();
     setCourse(null);
     setSelectedSubjectIds([]);
     setResponses({});
@@ -265,13 +302,9 @@ export function SurveyForm() {
     <main className="grid flex-1 place-items-center py-6 sm:py-10">
       {step === "participant" ? (
         <ParticipantStep
-          cpf={cpf}
-          matricula={matricula}
           participantType={participantType}
           acceptedTerms={acceptedTerms}
-          onCpfChange={setCpf}
-          onMatriculaChange={setMatricula}
-          onParticipantTypeChange={setParticipantType}
+          onParticipantTypeChange={selectParticipantType}
           onAcceptedTermsChange={setAcceptedTerms}
           onNext={() => void participantNext()}
           error={formError}
@@ -294,15 +327,16 @@ export function SurveyForm() {
         <EmailVerificationStep
           loading={verificationLoading}
           error={verificationError}
-          onBack={() => setStep("participant")}
+          onBack={reset}
           onSubmit={requestCode}
         />
       ) : null}
       {step === "pin" ? (
         <PinVerificationStep
+          key={verificationId ?? "no-verification"}
           loading={verificationLoading}
           error={verificationError}
-          onBack={() => setStep("email")}
+          onBack={restartEmailVerification}
           onConfirm={confirmCode}
           onResend={resend}
         />
@@ -318,7 +352,9 @@ export function SurveyForm() {
           isLoading={false}
           error=""
           onRetry={() => undefined}
-          onBack={() => setStep(isStaffJourney ? "email" : "form")}
+          onBack={() =>
+            isStaffJourney ? restartEmailVerification() : setStep("form")
+          }
           onNext={() => setStep("subjects")}
         />
       ) : null}
@@ -359,7 +395,9 @@ export function SurveyForm() {
               ? subjectIndex
                 ? setSubjectIndex(subjectIndex - 1)
                 : setStep("subjects")
-              : setStep(participantType === "aluno" ? "form" : "email")
+              : participantType === "aluno"
+                ? setStep("form")
+                : restartEmailVerification()
           }
           onNext={() => {
             if (

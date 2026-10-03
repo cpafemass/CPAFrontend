@@ -3,12 +3,8 @@ import type { ParticipantType } from "../../../lib/survey-types";
 import { Button } from "../ui/Button";
 
 interface Props {
-  cpf: string;
-  matricula: string;
   participantType: ParticipantType | null;
   acceptedTerms: boolean;
-  onCpfChange: (value: string) => void;
-  onMatriculaChange: (value: string) => void;
   onParticipantTypeChange: (value: ParticipantType) => void;
   onAcceptedTermsChange: (value: boolean) => void;
   onNext: () => void;
@@ -40,13 +36,7 @@ const options: Array<{
 
 export function ParticipantStep(props: Props) {
   const [touched, setTouched] = useState(false);
-  const student = props.participantType === "aluno";
-  const valid =
-    Boolean(props.participantType) &&
-    props.acceptedTerms &&
-    (!student ||
-      (props.cpf.replace(/\D/g, "").length === 11 &&
-        props.matricula.replace(/\D/g, "").length === 10));
+  const valid = Boolean(props.participantType) && props.acceptedTerms;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setTouched(true);
@@ -88,32 +78,6 @@ export function ParticipantStep(props: Props) {
             </button>
           ))}
         </fieldset>
-        {student ? (
-          <div className="grid gap-5 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-bold text-slate-700">
-              CPF
-              <input
-                className="h-12 rounded-lg border border-slate-300 px-4 text-base"
-                inputMode="numeric"
-                maxLength={11}
-                value={props.cpf}
-                onChange={(e) =>
-                  props.onCpfChange(e.target.value.replace(/\D/g, "").slice(0, 11))
-                }
-              />
-            </label>
-            <label className="grid gap-2 text-sm font-bold text-slate-700">
-              Matrícula
-              <input
-                className="h-12 rounded-lg border border-slate-300 px-4 text-base"
-                inputMode="numeric"
-                maxLength={10}
-                value={props.matricula}
-                onChange={(e) => props.onMatriculaChange(e.target.value.slice(0, 10))}
-              />
-            </label>
-          </div>
-        ) : null}
         <label className="flex items-start gap-3 rounded-lg bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
           <input
             className="mt-1 shrink-0"
