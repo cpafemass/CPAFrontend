@@ -13,6 +13,12 @@ VITE_API_BASE_URL=http://localhost:8080
 # Código da campanha consultada no catálogo.
 VITE_CPA_CAMPAIGN=cpa-2026
 
+# Endpoint público usado para verificar se a campanha está aberta.
+VITE_CPA_CAMPAIGN_STATE_ENDPOINT=/campanha/estado-publico
+
+# Mensagem padrão quando a campanha estiver indisponível.
+VITE_CPA_CAMPAIGN_UNAVAILABLE_MESSAGE=A pesquisa está indisponível no momento. Tente novamente mais tarde.
+
 # Porta HTTP do container Nginx ao executar Docker Compose.
 FRONTEND_PORT=5173
 ```
