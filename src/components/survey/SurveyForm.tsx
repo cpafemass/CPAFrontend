@@ -30,6 +30,27 @@ import { SubjectStep } from "./steps/SubjectStep";
 
 const emptyResponses = (): Respostas => ({ opcoes: {}, comentario: "" });
 
+const journeyFormsByParticipant = {
+  professor: [
+    "docente_disciplinas",
+    "docente_gestao",
+    "docente_instituicao",
+  ],
+  funcionario: ["funcionario_gestao", "funcionario_instituicao"],
+} as const;
+
+function staffJourneyForms(
+  participantType: Exclude<ParticipantType, "aluno">,
+  catalog: CatalogForm[],
+) {
+  const codes = journeyFormsByParticipant[participantType];
+  const forms = codes.map((code) => catalog.find((form) => form.code === code));
+  if (forms.some((form) => !form)) {
+    throw new Error("A jornada desta avaliação não está disponível no momento.");
+  }
+  return forms as CatalogForm[];
+}
+
 export function SurveyForm() {
   const [step, setStep] = useState<Step>("participant");
   const [participantType, setParticipantType] =
@@ -62,13 +83,26 @@ export function SurveyForm() {
     [course, selectedSubjectIds],
   );
   const currentSubject = selectedSubjects[subjectIndex];
+  const isStaffJourney =
+    participantType === "professor" || participantType === "funcionario";
+  const currentFormIndex = form
+    ? forms.findIndex(
+        (item) => item.code === form.code && item.version === form.version,
+      )
+    : -1;
+  const nextForm =
+    isStaffJourney && currentFormIndex >= 0
+      ? forms[currentFormIndex + 1]
+      : undefined;
 
   const loadForms = useCallback(async () => {
     if (!participantType) return;
     setLoadingForms(true);
     setFormError("");
     try {
-      setForms(await fetchCatalog(participantType));
+      const catalog = await fetchCatalog(participantType);
+      setForms(catalog);
+      return catalog;
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -80,15 +114,42 @@ export function SurveyForm() {
     }
   }, [participantType]);
   const participantNext = async () => {
-    await loadForms();
-    setStep("form");
+    const catalog = await loadForms();
+    if (!catalog?.length) return;
+    if (!participantType) return;
+    if (participantType === "aluno") {
+      setStep("form");
+      return;
+    }
+    try {
+      const journey = staffJourneyForms(participantType, catalog);
+      setForms(journey);
+      setForm(journey[0]);
+      setStep("email");
+    } catch (error) {
+      setForms([]);
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "A jornada desta avaliação não está disponível no momento.",
+      );
+      setStep("form");
+    }
   };
-  const startForm = async () => {
+  const resetAnswersForForm = () => {
+    setCourse(null);
+    setSelectedSubjectIds([]);
+    setSubjectIndex(0);
+    setResponses({});
+    setGeneralResponses(emptyResponses);
+  };
+  const startForm = async (verified = false) => {
     if (!form || !participantType) return;
-    if (participantType !== "aluno" && !submissionToken) {
+    if (participantType !== "aluno" && !submissionToken && !verified) {
       setStep("email");
       return;
     }
+    resetAnswersForForm();
     if (form.scope === "DISCIPLINA") {
       try {
         setCourses(await fetchFormCourses(participantType));
@@ -142,32 +203,48 @@ export function SurveyForm() {
     }
   };
   const startAfterVerification = async () => {
-    if (!form || !participantType) return;
-    if (form.scope === "DISCIPLINA") {
-      setCourses(await fetchFormCourses(participantType));
-      setStep("course");
-    } else setStep("questionnaire");
+    await startForm(true);
   };
   const submit = async () => {
     if (!form || !participantType) return;
     setIsSubmitting(true);
+    let advancesToNextForm = false;
     try {
-      setResult(
-        await submitSurvey(
-          buildSurveyApiPayload({
-            form,
-            participantType,
-            acceptedTerms,
-            cpf,
-            matricula,
-            emailVerificationToken: submissionToken,
-            course,
-            subjects: selectedSubjects,
-            responses,
-            generalResponses,
-          }),
-        ),
+      const submission = await submitSurvey(
+        buildSurveyApiPayload({
+          form,
+          participantType,
+          acceptedTerms,
+          cpf,
+          matricula,
+          emailVerificationToken: submissionToken,
+          course,
+          subjects: selectedSubjects,
+          responses,
+          generalResponses,
+        }),
       );
+      if (submission.ok && nextForm) {
+        advancesToNextForm = true;
+        setForm(nextForm);
+        resetAnswersForForm();
+        setResult(null);
+        if (nextForm.scope === "DISCIPLINA") {
+          try {
+            setCourses(await fetchFormCourses(participantType));
+            setStep("course");
+          } catch (error) {
+            setFormError(
+              error instanceof Error
+                ? error.message
+                : "Não foi possível carregar os cursos.",
+            );
+            setStep("form");
+          }
+        } else setStep("questionnaire");
+        return;
+      }
+      setResult(submission);
     } catch (error) {
       setResult({
         ok: false,
@@ -179,7 +256,7 @@ export function SurveyForm() {
       });
     } finally {
       setIsSubmitting(false);
-      setStep("confirmation");
+      if (!advancesToNextForm) setStep("confirmation");
     }
   };
   const reset = () => {
@@ -189,6 +266,7 @@ export function SurveyForm() {
     setMatricula("");
     setAcceptedTerms(false);
     setForm(null);
+    setForms([]);
     setSubmissionToken(null);
     setVerificationId(null);
     setEmail("");
@@ -218,7 +296,7 @@ export function SurveyForm() {
       ) : null}
       {step === "form" ? (
         <FormSelectionStep
-          forms={forms}
+          forms={isStaffJourney && form ? [form] : forms}
           selected={form}
           loading={loadingForms}
           error={formError}
@@ -232,7 +310,7 @@ export function SurveyForm() {
         <EmailVerificationStep
           loading={verificationLoading}
           error={verificationError}
-          onBack={() => setStep("form")}
+          onBack={() => setStep("participant")}
           onSubmit={requestCode}
         />
       ) : null}
@@ -256,7 +334,7 @@ export function SurveyForm() {
           isLoading={false}
           error=""
           onRetry={() => undefined}
-          onBack={() => setStep("form")}
+          onBack={() => setStep(isStaffJourney ? "email" : "form")}
           onNext={() => setStep("subjects")}
         />
       ) : null}
@@ -297,7 +375,7 @@ export function SurveyForm() {
               ? subjectIndex
                 ? setSubjectIndex(subjectIndex - 1)
                 : setStep("subjects")
-              : setStep(participantType === "aluno" ? "form" : "pin")
+              : setStep(participantType === "aluno" ? "form" : "email")
           }
           onNext={() => {
             if (
@@ -312,6 +390,13 @@ export function SurveyForm() {
             form.scope !== "DISCIPLINA" ||
             subjectIndex === selectedSubjects.length - 1
           }
+          isFinalJourney={!isStaffJourney || !nextForm}
+          journeyPosition={
+            isStaffJourney && currentFormIndex >= 0
+              ? currentFormIndex + 1
+              : undefined
+          }
+          journeyTotal={isStaffJourney ? forms.length : undefined}
         />
       ) : null}
       {step === "confirmation" ? (

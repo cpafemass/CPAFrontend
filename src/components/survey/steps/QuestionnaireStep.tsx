@@ -15,6 +15,9 @@ interface Props {
   onNext: () => void;
   isSubmitting: boolean;
   isLast: boolean;
+  isFinalJourney: boolean;
+  journeyPosition?: number;
+  journeyTotal?: number;
 }
 export function QuestionnaireStep({
   form,
@@ -25,6 +28,9 @@ export function QuestionnaireStep({
   onNext,
   isSubmitting,
   isLast,
+  isFinalJourney,
+  journeyPosition,
+  journeyTotal,
 }: Props) {
   const complete = form.questions.every((question) =>
     Boolean(respostas.opcoes[question.id]),
@@ -35,6 +41,11 @@ export function QuestionnaireStep({
         <h2 className="text-3xl font-black leading-tight text-slate-950 sm:text-4xl">
           {form.name}
         </h2>
+        {journeyPosition && journeyTotal ? (
+          <p className="text-sm font-bold text-blue-700">
+            Etapa {journeyPosition} de {journeyTotal} da sua jornada
+          </p>
+        ) : null}
         {materia ? (
           <p className="text-slate-600">
             {materia.nome} — {materia.docente}
@@ -100,7 +111,9 @@ export function QuestionnaireStep({
           {isSubmitting
             ? "Enviando..."
             : isLast
-              ? "Finalizar Pesquisa"
+              ? isFinalJourney
+                ? "Finalizar Pesquisa"
+                : "Próxima etapa"
               : "Próxima Disciplina"}
         </Button>
       </Actions>
