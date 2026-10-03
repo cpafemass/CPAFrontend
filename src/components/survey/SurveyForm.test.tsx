@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CatalogForm } from '../../lib/survey-types'
 import { fetchCatalog, fetchFormCourses } from '../../services/catalog-api'
@@ -66,6 +66,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks()
+  cleanup()
 })
 
 function continueFromParticipant(roleName: string) {
@@ -139,5 +140,57 @@ describe('SurveyForm', () => {
       aceiteTermosCondicoesServico: true,
       emailVerificationToken: 'opaque-proof',
     })
+  })
+
+  it('shows only one opaque proof representation and keeps it out of URL/logs', async () => {
+    const receipt = 'data:image/png;base64,ZmFrZS1xci1wcm9vZg=='
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.mocked(submitSurvey).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      message: 'Avaliação enviada com sucesso.',
+      proof: { kind: 'qr', value: receipt },
+    })
+
+    render(<SurveyForm />)
+    continueFromParticipant('Estudante')
+    fireEvent.click(await screen.findByRole('button', { name: /^Avaliação discente/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sim' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar Pesquisa' }))
+
+    await screen.findByRole('heading', { name: 'Avaliação enviada' })
+    expect(screen.getByText('Comprovante')).not.toBeNull()
+    expect(screen.getByRole('img', { name: 'QR Code de confirmação da participação' })).not.toBeNull()
+    expect(screen.queryByText(receipt)).toBeNull()
+    expect(window.location.href).not.toContain(receipt)
+    expect(JSON.stringify(consoleLog.mock.calls)).not.toContain(receipt)
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain(receipt)
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(receipt)
+
+    consoleLog.mockRestore()
+    consoleWarn.mockRestore()
+    consoleError.mockRestore()
+  })
+
+  it('re-checks available scopes before starting a new response from confirmation', async () => {
+    vi.mocked(fetchCatalog)
+      .mockResolvedValueOnce([studentForm])
+      .mockResolvedValueOnce([])
+
+    render(<SurveyForm />)
+    continueFromParticipant('Estudante')
+    fireEvent.click(await screen.findByRole('button', { name: /^Avaliação discente/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sim' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar Pesquisa' }))
+
+    await screen.findByRole('heading', { name: 'Avaliação enviada' })
+    fireEvent.click(screen.getByRole('button', { name: 'Nova resposta' }))
+
+    await screen.findByText('Não há mais formulários disponíveis para esta sessão.')
+    expect(screen.getByRole('button', { name: 'Continuar' })).not.toBeNull()
   })
 })
