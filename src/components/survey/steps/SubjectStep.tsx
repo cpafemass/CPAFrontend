@@ -62,21 +62,26 @@ export function SubjectStep({
         </div>
       ) : null}
 
-      <div className="mb-7 grid gap-3">
-        {filteredMaterias.map((materia) => {
-          const selected = selectedSubjectIds.includes(materia.id);
+      <div
+        className="mb-7 max-h-[50vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-[32rem]"
+        aria-label="Disciplinas disponíveis"
+      >
+        <div className="grid gap-3">
+          {filteredMaterias.map((materia) => {
+            const selected = selectedSubjectIds.includes(materia.id);
 
-          return (
-            <OptionButton
-              icon={selected ? "OK" : "MAT"}
-              key={materia.id}
-              selected={selected}
-              title={materia.nome}
-              subtitle={materia.docente}
-              onClick={() => onSubjectToggle(materia.id)}
-            />
-          );
-        })}
+            return (
+              <OptionButton
+                icon={selected ? "OK" : "MAT"}
+                key={materia.id}
+                selected={selected}
+                title={materia.nome}
+                subtitle={materia.docente}
+                onClick={() => onSubjectToggle(materia.id)}
+              />
+            );
+          })}
+        </div>
       </div>
 
       {filteredMaterias.length === 0 ? (

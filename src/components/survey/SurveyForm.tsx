@@ -30,27 +30,6 @@ import { SubjectStep } from "./steps/SubjectStep";
 
 const emptyResponses = (): Respostas => ({ opcoes: {}, comentario: "" });
 
-const journeyFormsByParticipant = {
-  professor: [
-    "docente_disciplinas",
-    "docente_gestao",
-    "docente_instituicao",
-  ],
-  funcionario: ["funcionario_gestao", "funcionario_instituicao"],
-} as const;
-
-function staffJourneyForms(
-  participantType: Exclude<ParticipantType, "aluno">,
-  catalog: CatalogForm[],
-) {
-  const codes = journeyFormsByParticipant[participantType];
-  const forms = codes.map((code) => catalog.find((form) => form.code === code));
-  if (forms.some((form) => !form)) {
-    throw new Error("A jornada desta avaliação não está disponível no momento.");
-  }
-  return forms as CatalogForm[];
-}
-
 export function SurveyForm() {
   const [step, setStep] = useState<Step>("participant");
   const [participantType, setParticipantType] =
@@ -102,6 +81,11 @@ export function SurveyForm() {
     try {
       const catalog = await fetchCatalog(participantType);
       setForms(catalog);
+      setForm((current) =>
+        current
+          ? (catalog.find((item) => item.code === current.code) ?? null)
+          : current,
+      );
       return catalog;
     } catch (error) {
       setFormError(
@@ -121,20 +105,8 @@ export function SurveyForm() {
       setStep("form");
       return;
     }
-    try {
-      const journey = staffJourneyForms(participantType, catalog);
-      setForms(journey);
-      setForm(journey[0]);
-      setStep("email");
-    } catch (error) {
-      setForms([]);
-      setFormError(
-        error instanceof Error
-          ? error.message
-          : "A jornada desta avaliação não está disponível no momento.",
-      );
-      setStep("form");
-    }
+    setForm(catalog[0]);
+    setStep("email");
   };
   const resetAnswersForForm = () => {
     setCourse(null);
@@ -209,6 +181,7 @@ export function SurveyForm() {
     if (!form || !participantType) return;
     setIsSubmitting(true);
     let advancesToNextForm = false;
+    let shouldShowConfirmation = true;
     try {
       const submission = await submitSurvey(
         buildSurveyApiPayload({
@@ -244,6 +217,15 @@ export function SurveyForm() {
         } else setStep("questionnaire");
         return;
       }
+      if (!submission.ok && [400, 404, 409, 422].includes(submission.status)) {
+        shouldShowConfirmation = false;
+        setResult(null);
+        setFormError(
+          "Este formulário foi atualizado ou não está mais disponível. Atualize os formulários e tente novamente.",
+        );
+        setStep("form");
+        return;
+      }
       setResult(submission);
     } catch (error) {
       setResult({
@@ -256,7 +238,7 @@ export function SurveyForm() {
       });
     } finally {
       setIsSubmitting(false);
-      if (!advancesToNextForm) setStep("confirmation");
+      if (!advancesToNextForm && shouldShowConfirmation) setStep("confirmation");
     }
   };
   const reset = () => {
@@ -292,6 +274,8 @@ export function SurveyForm() {
           onParticipantTypeChange={setParticipantType}
           onAcceptedTermsChange={setAcceptedTerms}
           onNext={() => void participantNext()}
+          error={formError}
+          onRetry={() => void participantNext()}
         />
       ) : null}
       {step === "form" ? (

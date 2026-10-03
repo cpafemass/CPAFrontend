@@ -12,6 +12,8 @@ interface Props {
   onParticipantTypeChange: (value: ParticipantType) => void;
   onAcceptedTermsChange: (value: boolean) => void;
   onNext: () => void;
+  error?: string;
+  onRetry?: () => void;
 }
 
 const options: Array<{
@@ -93,8 +95,11 @@ export function ParticipantStep(props: Props) {
               <input
                 className="h-12 rounded-lg border border-slate-300 px-4 text-base"
                 inputMode="numeric"
+                maxLength={11}
                 value={props.cpf}
-                onChange={(e) => props.onCpfChange(e.target.value)}
+                onChange={(e) =>
+                  props.onCpfChange(e.target.value.replace(/\D/g, "").slice(0, 11))
+                }
               />
             </label>
             <label className="grid gap-2 text-sm font-bold text-slate-700">
@@ -102,8 +107,9 @@ export function ParticipantStep(props: Props) {
               <input
                 className="h-12 rounded-lg border border-slate-300 px-4 text-base"
                 inputMode="numeric"
+                maxLength={10}
                 value={props.matricula}
-                onChange={(e) => props.onMatriculaChange(e.target.value)}
+                onChange={(e) => props.onMatriculaChange(e.target.value.slice(0, 10))}
               />
             </label>
           </div>
@@ -121,6 +127,16 @@ export function ParticipantStep(props: Props) {
           <p className="text-sm font-semibold text-red-600">
             Preencha os campos obrigatórios para continuar.
           </p>
+        ) : null}
+        {props.error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+            <p>{props.error}</p>
+            {props.onRetry ? (
+              <Button className="mt-3" type="button" onClick={props.onRetry}>
+                Tentar novamente
+              </Button>
+            ) : null}
+          </div>
         ) : null}
         <Button className="w-full" type="submit">
           Continuar

@@ -1,7 +1,17 @@
 import type { CatalogForm, Curso, Materia, ParticipantType, Respostas, SurveyApiAnswer, SurveyApiPayload } from './survey-types'
+import { availableOptions, availableQuestions } from './survey-catalog'
 
 function answersFor(form: CatalogForm, respostas: Respostas): SurveyApiAnswer[] {
-  return form.questions.map((question) => ({ questionId: question.id, optionCode: respostas.opcoes[question.id] }))
+  return availableQuestions(form).flatMap((question) => {
+    const optionCode = respostas.opcoes[question.id]
+    if (!optionCode) return []
+
+    const isAvailableOption = availableOptions(question).some(
+      (option) => option.code === optionCode,
+    )
+
+    return isAvailableOption ? [{ questionId: question.id, optionCode }] : []
+  })
 }
 
 interface BuildPayloadInput {
@@ -20,7 +30,7 @@ export function buildSurveyApiPayload(input: BuildPayloadInput): SurveyApiPayloa
   if (input.form.scope === 'DISCIPLINA' && input.course) {
     payload.course = { id: input.course.id, name: input.course.nome }
     payload.subjects = input.subjects.map((subject) => {
-      const respostas = input.responses[subject.id]
+      const respostas = input.responses[subject.id] ?? { opcoes: {}, comentario: '' }
       return { subjectId: subject.id, subjectName: subject.nome, teacherName: subject.docente, answers: answersFor(input.form, respostas), ...(input.form.commentAllowed && respostas.comentario.trim() ? { comment: respostas.comentario.trim() } : {}) }
     })
   } else {

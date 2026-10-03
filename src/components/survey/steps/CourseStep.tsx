@@ -49,17 +49,22 @@ export function CourseStep({
       ) : null}
 
       {!isLoading && !error ? (
-        <div className="mb-7 grid gap-3">
-          {cursos.map((curso) => (
-            <OptionButton
-              icon="CUR"
-              key={curso.id}
-              selected={selectedCourseId === curso.id}
-              title={curso.nome}
-              subtitle={`${curso.materias.length} ${curso.materias.length === 1 ? "disciplina" : "disciplinas"} disponíveis`}
-              onClick={() => onCourseSelect(curso.id)}
-            />
-          ))}
+        <div
+          className="mb-7 max-h-[50vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-[32rem]"
+          aria-label="Cursos disponíveis"
+        >
+          <div className="grid gap-3">
+            {cursos.map((curso) => (
+              <OptionButton
+                icon="CUR"
+                key={curso.id}
+                selected={selectedCourseId === curso.id}
+                title={curso.nome}
+                subtitle={`${curso.materias.length} ${curso.materias.length === 1 ? "disciplina" : "disciplinas"} disponíveis`}
+                onClick={() => onCourseSelect(curso.id)}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
 
