@@ -6,21 +6,25 @@ interface QRCodeImageProps {
 }
 
 export function QRCodeImage({ value }: QRCodeImageProps) {
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
-  const [error, setError] = useState("");
+  const [generated, setGenerated] = useState({
+    value: "",
+    qrCodeUrl: "",
+    error: "",
+  });
   const isImageDataUrl = value.startsWith("data:image/");
+  const qrCodeUrl = isImageDataUrl
+    ? value
+    : generated.value === value
+      ? generated.qrCodeUrl
+      : "";
+  const error =
+    !isImageDataUrl && generated.value === value ? generated.error : "";
 
   useEffect(() => {
     let isMounted = true;
-    setQrCodeUrl("");
-    setError("");
-
-    if (isImageDataUrl) {
-      setQrCodeUrl(value);
-      return () => {
-        isMounted = false;
-      };
-    }
+    if (isImageDataUrl) return () => {
+      isMounted = false;
+    };
 
     QRCode.toDataURL(value, {
       errorCorrectionLevel: "M",
@@ -32,10 +36,18 @@ export function QRCodeImage({ value }: QRCodeImageProps) {
       },
     })
       .then((nextQrCodeUrl) => {
-        if (isMounted) setQrCodeUrl(nextQrCodeUrl);
+        if (isMounted) {
+          setGenerated({ value, qrCodeUrl: nextQrCodeUrl, error: "" });
+        }
       })
       .catch(() => {
-        if (isMounted) setError("Não foi possível gerar a imagem do QR Code.");
+        if (isMounted) {
+          setGenerated({
+            value,
+            qrCodeUrl: "",
+            error: "Não foi possível gerar a imagem do QR Code.",
+          });
+        }
       });
 
     return () => {

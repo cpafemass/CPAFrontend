@@ -3,6 +3,12 @@ import type {
   Materia,
   Respostas,
 } from "../../../lib/survey-types";
+import {
+  availableOptions,
+  availableQuestions,
+  isCommentRequired,
+  isQuestionRequired,
+} from "../../../lib/survey-catalog";
 import { Actions } from "../ui/Actions";
 import { Button } from "../ui/Button";
 
@@ -32,9 +38,15 @@ export function QuestionnaireStep({
   journeyPosition,
   journeyTotal,
 }: Props) {
-  const complete = form.questions.every((question) =>
-    Boolean(respostas.opcoes[question.id]),
-  );
+  const questions = availableQuestions(form);
+  const hasMissingRequiredAnswer = questions
+    .filter(isQuestionRequired)
+    .some((question) =>
+      !respostas.opcoes[question.id],
+    );
+  const hasMissingRequiredComment =
+    isCommentRequired(form) && !respostas.comentario.trim();
+  const complete = !hasMissingRequiredAnswer && !hasMissingRequiredComment;
   return (
     <section className="survey-enter w-full max-w-2xl px-4 sm:px-6">
       <div className="mb-8 space-y-3 text-center sm:mb-10">
@@ -53,7 +65,7 @@ export function QuestionnaireStep({
         ) : null}
       </div>
       <div className="grid gap-8 rounded-xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/10 sm:gap-10 sm:p-8">
-        {form.questions.map((question, index) => (
+        {questions.map((question, index) => (
           <fieldset
             className="grid gap-4 border-b border-slate-100 pb-8 last:border-0 last:pb-0"
             key={question.id}
@@ -61,9 +73,14 @@ export function QuestionnaireStep({
             <legend className="leading-relaxed font-bold text-slate-800">
               <span className="mr-2 text-blue-700">{index + 1}.</span>
               {question.texto}
+              {isQuestionRequired(question) ? (
+                <span className="ml-1 text-red-700" aria-label="Obrigatória">
+                  *
+                </span>
+              ) : null}
             </legend>
             <div className="grid gap-3 sm:grid-cols-2">
-              {question.options.map((option) => (
+              {availableOptions(question).map((option) => (
                 <button
                   className={`min-h-12 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${respostas.opcoes[question.id] === option.code ? "border-blue-700 bg-blue-50 text-blue-800 ring-2 ring-blue-700/10" : "border-slate-200 hover:border-blue-300"}`}
                   type="button"
@@ -83,11 +100,14 @@ export function QuestionnaireStep({
                 </button>
               ))}
             </div>
+            {!isQuestionRequired(question) ? (
+              <p className="text-sm text-slate-500">Resposta opcional.</p>
+            ) : null}
           </fieldset>
         ))}
         {form.commentAllowed ? (
           <label className="grid gap-3 border-t border-slate-200 pt-7 text-sm font-bold text-slate-700">
-            Comentários adicionais
+            Comentários adicionais{isCommentRequired(form) ? " *" : ""}
             {form.commentNotice ? (
               <small className="font-normal leading-relaxed text-slate-500">
                 {form.commentNotice}
@@ -95,6 +115,7 @@ export function QuestionnaireStep({
             ) : null}
             <textarea
               className="min-h-32 rounded-lg border border-slate-300 p-3 text-base font-normal"
+              required={isCommentRequired(form)}
               value={respostas.comentario}
               onChange={(e) =>
                 onChange({ ...respostas, comentario: e.target.value })
@@ -119,7 +140,9 @@ export function QuestionnaireStep({
       </Actions>
       {!complete ? (
         <p className="mt-5 text-center text-sm text-slate-500">
-          Responda todas as questões para continuar.
+          {hasMissingRequiredAnswer
+            ? "Responda todas as questões obrigatórias para continuar."
+            : "Adicione o comentário obrigatório para continuar."}
         </p>
       ) : null}
     </section>

@@ -46,7 +46,7 @@ export function FormSelectionStep({
         <div className="grid gap-4">
           {forms.map((form) => (
             <button
-              className={`rounded-xl border p-4 text-left transition sm:p-5 ${selected?.code === form.code ? "border-blue-700 bg-blue-50 ring-2 ring-blue-700/10" : "border-slate-200 hover:border-blue-300"}`}
+              className={`rounded-xl border p-4 text-left transition sm:p-5 ${selected?.code === form.code && selected.version === form.version ? "border-blue-700 bg-blue-50 ring-2 ring-blue-700/10" : "border-slate-200 hover:border-blue-300"}`}
               key={`${form.code}-${form.version}`}
               onClick={() => onSelect(form)}
             >

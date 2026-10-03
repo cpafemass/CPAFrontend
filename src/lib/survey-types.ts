@@ -6,6 +6,8 @@ export type FormScope = 'DISCIPLINA' | 'GERAL'
 export interface CatalogOption {
   code: string
   label: string
+  order?: number
+  active?: boolean
   naoSeiResponder?: boolean
 }
 
@@ -13,6 +15,8 @@ export interface Pergunta {
   id: QuestionId
   texto: string
   ordem?: number
+  required?: boolean
+  active?: boolean
   options: CatalogOption[]
 }
 
@@ -25,7 +29,9 @@ export interface CatalogForm {
   order: number
   scope: FormScope
   commentAllowed: boolean
+  commentRequired?: boolean
   commentNotice?: string
+  active?: boolean
   questions: Pergunta[]
 }
 

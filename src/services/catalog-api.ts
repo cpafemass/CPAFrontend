@@ -1,4 +1,5 @@
 import type { CatalogForm, Curso, ParticipantType } from '../lib/survey-types'
+import { normalizeCatalog } from '../lib/survey-catalog'
 import { buildApiEndpoint } from '../config/api'
 import { fetchWithRetry } from '../utils/fetch-with-retry'
 
@@ -15,7 +16,12 @@ export async function fetchCatalog(participantType: ParticipantType): Promise<Ca
   const query = new URLSearchParams({ campaign, publico: participantType })
   const response = await fetchWithRetry(buildApiEndpoint(`/formularios?${query}`))
   if (!response.ok) throw new Error((await responseMessage(response)) || 'Não foi possível carregar os formulários.')
-  return await response.json() as CatalogForm[]
+  const catalog = normalizeCatalog(await response.json())
+  if (catalog.some((form) => form.audience !== participantType)) {
+    throw new Error('O catálogo retornou um formulário incompatível com o seu perfil.')
+  }
+
+  return catalog
 }
 
 export async function fetchFormCourses(participantType: ParticipantType): Promise<Curso[]> {
