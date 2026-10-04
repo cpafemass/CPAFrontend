@@ -6,26 +6,38 @@ afterEach(() => {
 });
 
 describe("fetchCampaignPublicState", () => {
-  it("returns open campaign state from boolean response", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ aberta: true }), { status: 200 }),
-      ),
-    );
-
-    await expect(fetchCampaignPublicState()).resolves.toEqual({ isOpen: true });
-  });
-
-  it("maps textual state and unavailable message from backend", async () => {
+  it("uses backend availability as the source of truth", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
+            campanha: "cpa-2026",
+            estado: "ABERTA",
+            disponivelParaResposta: true,
+            mensagem: "Campanha disponível para respostas.",
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    await expect(fetchCampaignPublicState()).resolves.toEqual({
+      isOpen: true,
+      unavailableMessage: "Campanha disponível para respostas.",
+    });
+  });
+
+  it("maps unavailable message from the backend", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            campanha: "cpa-2026",
             estado: "ENCERRADA",
-            mensagemIndisponibilidade:
-              "A campanha está encerrada para respostas no momento.",
+            disponivelParaResposta: false,
+            mensagem: "A campanha está encerrada para respostas no momento.",
           }),
           { status: 200 },
         ),
@@ -37,6 +49,25 @@ describe("fetchCampaignPublicState", () => {
       unavailableMessage:
         "A campanha está encerrada para respostas no momento.",
     });
+  });
+
+  it("rejects responses without backend availability", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            campanha: "cpa-2026",
+            estado: "ABERTA",
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    await expect(fetchCampaignPublicState()).rejects.toThrow(
+      "A resposta de disponibilidade da campanha é inválida.",
+    );
   });
 
   it("surfaces backend failure messages", async () => {
