@@ -10,11 +10,9 @@ Crie um arquivo `.env` na raiz do projeto. Ele é ignorado pelo Git e não deve 
 # URL pública da API. Sem barra no fim.
 VITE_API_BASE_URL=http://localhost:8080
 
-# Código da campanha consultada no catálogo.
+# Código da campanha consultada no catálogo e no endpoint público
+# /campanhas/{codigo}/disponibilidade.
 VITE_CPA_CAMPAIGN=cpa-2026
-
-# Endpoint público usado para verificar se a campanha está aberta.
-VITE_CPA_CAMPAIGN_STATE_ENDPOINT=/campanha/estado-publico
 
 # Mensagem padrão quando a campanha estiver indisponível.
 VITE_CPA_CAMPAIGN_UNAVAILABLE_MESSAGE=A pesquisa está indisponível no momento. Tente novamente mais tarde.
