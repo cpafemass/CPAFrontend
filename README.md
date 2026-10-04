@@ -10,8 +10,12 @@ Crie um arquivo `.env` na raiz do projeto. Ele é ignorado pelo Git e não deve 
 # URL pública da API. Sem barra no fim.
 VITE_API_BASE_URL=http://localhost:8080
 
-# Código da campanha consultada no catálogo.
+# Código da campanha consultada no catálogo e no endpoint público
+# /campanhas/{codigo}/disponibilidade.
 VITE_CPA_CAMPAIGN=cpa-2026
+
+# Mensagem padrão quando a campanha estiver indisponível.
+VITE_CPA_CAMPAIGN_UNAVAILABLE_MESSAGE=A pesquisa está indisponível no momento. Tente novamente mais tarde.
 
 # Porta HTTP do container Nginx ao executar Docker Compose.
 FRONTEND_PORT=5173
