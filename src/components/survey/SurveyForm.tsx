@@ -13,6 +13,7 @@ import {
   confirmEmailVerification,
   requestEmailVerification,
 } from "../../services/email-verification-api";
+import { fetchCampaignPublicState } from "../../services/campaign-state-api";
 import {
   submitSurvey,
   type SubmitSurveyResult,
@@ -232,6 +233,20 @@ export function SurveyForm() {
     let advancesToNextForm = false;
     let shouldShowConfirmation = true;
     try {
+      const campaignState = await fetchCampaignPublicState();
+      if (!campaignState.isOpen) {
+        setResult({
+          ok: false,
+          status: campaignState.state === "ENCERRADA" ? 410 : 409,
+          message:
+            campaignState.unavailableMessage ||
+            (campaignState.state === "ENCERRADA"
+              ? "A campanha foi encerrada antes do envio da sua resposta."
+              : "A campanha não está disponível para respostas no momento."),
+        });
+        return;
+      }
+
       const submission = await submitSurvey(
         buildSurveyApiPayload({
           form,

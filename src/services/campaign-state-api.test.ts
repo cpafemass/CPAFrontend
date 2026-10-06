@@ -23,6 +23,7 @@ describe("fetchCampaignPublicState", () => {
     );
 
     await expect(fetchCampaignPublicState()).resolves.toEqual({
+      state: "ABERTA",
       isOpen: true,
       unavailableMessage: "Campanha disponível para respostas.",
     });
@@ -45,6 +46,7 @@ describe("fetchCampaignPublicState", () => {
     );
 
     await expect(fetchCampaignPublicState()).resolves.toEqual({
+      state: "ENCERRADA",
       isOpen: false,
       unavailableMessage:
         "A campanha está encerrada para respostas no momento.",

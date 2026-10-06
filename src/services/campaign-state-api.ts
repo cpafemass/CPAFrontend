@@ -13,7 +13,10 @@ interface CampaignStateApiResponse {
   mensagem?: string | null;
 }
 
+export type CampaignState = "RASCUNHO" | "APROVADA" | "ABERTA" | "ENCERRADA";
+
 export interface CampaignPublicState {
+  state: CampaignState;
   isOpen: boolean;
   unavailableMessage?: string;
 }
@@ -45,6 +48,7 @@ export async function fetchCampaignPublicState(): Promise<CampaignPublicState> {
   }
 
   return {
+    state: body.estado,
     isOpen: body.disponivelParaResposta,
     unavailableMessage: body.mensagem?.trim() || undefined,
   };
