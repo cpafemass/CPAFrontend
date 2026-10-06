@@ -6,6 +6,7 @@ import {
   confirmEmailVerification,
   requestEmailVerification,
 } from '../../services/email-verification-api'
+import { fetchCampaignPublicState } from '../../services/campaign-state-api'
 import { submitSurvey } from '../../services/survey-api'
 import { SurveyForm } from './SurveyForm'
 
@@ -17,6 +18,7 @@ vi.mock('../../services/email-verification-api', () => ({
   confirmEmailVerification: vi.fn(),
   requestEmailVerification: vi.fn(),
 }))
+vi.mock('../../services/campaign-state-api', () => ({ fetchCampaignPublicState: vi.fn() }))
 vi.mock('../../services/survey-api', () => ({ submitSurvey: vi.fn() }))
 
 const baseForm: Omit<CatalogForm, 'audience' | 'code' | 'name'> = {
@@ -57,6 +59,10 @@ beforeEach(() => {
   vi.mocked(confirmEmailVerification).mockResolvedValue({
     submissionToken: 'opaque-proof',
   })
+  vi.mocked(fetchCampaignPublicState).mockResolvedValue({
+    state: 'ABERTA',
+    isOpen: true,
+  })
   vi.mocked(submitSurvey).mockResolvedValue({
     ok: true,
     status: 200,
@@ -76,6 +82,24 @@ function continueFromParticipant(roleName: string) {
 }
 
 describe('SurveyForm', () => {
+  it('revalida a campanha e bloqueia o POST quando ela encerra durante o preenchimento', async () => {
+    vi.mocked(fetchCampaignPublicState).mockResolvedValueOnce({
+      state: 'ENCERRADA',
+      isOpen: false,
+      unavailableMessage: 'A campanha está encerrada para respostas.',
+    })
+
+    render(<SurveyForm />)
+    continueFromParticipant('Estudante')
+    fireEvent.click(await screen.findByRole('button', { name: /^Avaliação discente/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sim' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar Pesquisa' }))
+
+    expect(await screen.findByText('A campanha está encerrada para respostas.')).not.toBeNull()
+    expect(submitSurvey).not.toHaveBeenCalled()
+  })
+
   it('keeps student submissions anonymous and blocks a double submission', async () => {
     let resolveSubmission: () => void = () => undefined
     vi.mocked(submitSurvey).mockImplementation(
