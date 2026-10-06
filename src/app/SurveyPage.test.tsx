@@ -14,6 +14,7 @@ vi.mock("../components/survey/SurveyForm", () => ({
 describe("SurveyPage", () => {
   beforeEach(() => {
     vi.mocked(fetchCampaignPublicState).mockResolvedValue({
+      state: "ABERTA",
       isOpen: true,
     });
   });
@@ -33,6 +34,7 @@ describe("SurveyPage", () => {
 
   it("shows an unavailable message when the campaign is closed", async () => {
     vi.mocked(fetchCampaignPublicState).mockResolvedValueOnce({
+      state: "ENCERRADA",
       isOpen: false,
       unavailableMessage: "A campanha está encerrada para respostas.",
     });
