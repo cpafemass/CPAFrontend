@@ -15,9 +15,18 @@ export function EmailVerificationStep({
   error,
 }: EmailProps) {
   const [email, setEmail] = useState("");
+  const [validationError, setValidationError] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    void onSubmit(email.trim());
+    const normalizedEmail = email.trim();
+    if (!/^[A-Za-z._%+-]+@femass\.edu\.br$/i.test(normalizedEmail)) {
+      setValidationError(
+        "Informe seu e-mail institucional sem matrícula antes do @.",
+      );
+      return;
+    }
+    setValidationError("");
+    void onSubmit(normalizedEmail);
   };
   return (
     <section className="survey-enter w-full max-w-xl px-4 sm:px-6">
@@ -42,11 +51,24 @@ export function EmailVerificationStep({
             autoComplete="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (validationError) setValidationError("");
+            }}
+            aria-invalid={validationError ? "true" : undefined}
+            aria-describedby={validationError ? "institutional-email-error" : undefined}
           />
         </label>
-        {error ? (
-          <p className="text-sm font-semibold text-red-600">{error}</p>
+        {validationError ? (
+          <p
+            id="institutional-email-error"
+            role="alert"
+            className="text-sm font-semibold text-red-600"
+          >
+            {validationError}
+          </p>
+        ) : error ? (
+          <p role="alert" className="text-sm font-semibold text-red-600">{error}</p>
         ) : null}
         <Actions>
           <Button variant="secondary" type="button" onClick={onBack}>
