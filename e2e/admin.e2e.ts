@@ -1,0 +1,111 @@
+import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+async function mockServices(page: Page, role = 'cpa-admin', state = 'PUBLICADA') {
+  let nonce = ''
+  await page.route('http://127.0.0.1:8189/**', async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/auth')) {
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+      expect(url.searchParams.get('code_challenge')).toBeTruthy()
+      nonce = url.searchParams.get('nonce') || ''
+      const callback = new URL(url.searchParams.get('redirect_uri')!)
+      callback.hash = new URLSearchParams({ state: url.searchParams.get('state')!, code: 'test-code', session_state: 'session' }).toString()
+      await route.fulfill({ status: 302, headers: { Location: callback.toString() } })
+    } else if (url.pathname.endsWith('/token')) {
+      const now = Math.floor(Date.now() / 1000)
+      const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
+      const token = `${encode({ alg: 'RS256' })}.${encode({ sub: 'test-admin', preferred_username: 'comissao', iss: 'http://127.0.0.1:8189/realms/cpa', aud: 'cpa-backend', realm_access: { roles: [role] }, exp: now + 300, iat: now, nonce })}.test-signature`
+      await route.fulfill({ json: { access_token: token, id_token: token, refresh_token: token, token_type: 'Bearer', expires_in: 300 }, headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:5194', 'Access-Control-Allow-Credentials': 'true' } })
+    } else if (url.pathname.endsWith('/logout')) {
+      await route.fulfill({ status: 302, headers: { Location: url.searchParams.get('post_logout_redirect_uri') || 'http://127.0.0.1:5194/' } })
+    } else await route.fulfill({ json: {} })
+  })
+  const courses = [{ id: 1, nome: 'Engenharia de Produção', ativo: true }, { id: 2, nome: 'Administração', ativo: true }, { id: 3, nome: 'Curso desativado', ativo: false }]
+  const version = { id: 1, numero: 1, codigo: 'geral', nome: 'Avaliação institucional', publico: 'aluno', escopo: 'GERAL', ordem: 1, commentAllowed: false, commentNotice: null, estado: state, ativo: true, perguntas: [{ id: 1, codigo: 'q1', texto: 'A instituição oferece uma boa experiência de aprendizagem?', ordem: 1, ativo: true, opcoes: [{ id: 1, code: 'sim', label: 'Concordo totalmente', value: 4, naoSeiResponder: false, ativo: true }] }] }
+  await page.route('http://127.0.0.1:8199/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const headers = { 'Access-Control-Allow-Origin': 'http://127.0.0.1:5194', 'Access-Control-Allow-Headers': 'authorization,content-type', 'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,OPTIONS' }
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
+    if (path.startsWith('/admin/')) expect(request.headers().authorization).toMatch(/^Bearer /)
+    if (path.endsWith('/versoes/1') && request.method() === 'PUT') {
+      Object.assign(version, request.postDataJSON())
+      return route.fulfill({ status: 204, headers })
+    }
+    if (path.endsWith('/versoes/1/publicar') && request.method() === 'POST') {
+      version.estado = 'PUBLICADA'
+      return route.fulfill({ status: 204, headers })
+    }
+    if (path === '/admin/cursos' && request.method() === 'POST') {
+      const item = { id: courses.length + 1, nome: request.postDataJSON().nome as string, ativo: true }; courses.push(item)
+      return route.fulfill({ status: 201, json: item, headers })
+    }
+    if (/\/admin\/cursos\/\d+\/status$/.test(path)) {
+      courses.find(c => c.id === Number(path.split('/')[3]))!.ativo = request.postDataJSON().ativo
+      return route.fulfill({ status: 204, headers })
+    }
+    let json: unknown = []
+    if (path === '/admin/cursos') json = courses
+    else if (path === '/admin/disciplinas') json = [{ id: 1, nome: 'Planejamento e Controle da Produção', professor: 'Maria Silva', cursoId: 1, cursoNome: courses[0].nome, cursoAtivo: true, ativo: true }]
+    else if (path === '/admin/campanhas') json = [{ id: 1, codigo: 'cpa-2026', nome: 'Avaliação institucional 2026', mensagem: null, estado: 'ABERTA', ativo: true }]
+    else if (path.endsWith('/versoes/1')) json = version
+    else if (path.endsWith('/versoes')) json = [version]
+    else if (path.endsWith('/disponibilidade')) json = { campanha: 'cpa-2026', estado: 'ABERTA', disponivelParaResposta: true, mensagem: null }
+    await route.fulfill({ json, headers })
+  })
+}
+
+test('login PKCE, acesso direto, recarregamento, cadastros, desativação e navegação', async ({ page }, testInfo) => {
+  await mockServices(page)
+  await page.goto('/admin/cursos')
+  await expect(page.getByRole('heading', { name: 'Cursos', exact: true })).toBeVisible()
+  await expect(page.getByText('Engenharia de Produção', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('Engenharia de Produção', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Novo curso' }).click()
+  await page.getByLabel('Nome', { exact: true }).fill('Sistemas de Informação')
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
+  const row = page.getByRole('row').filter({ hasText: 'Sistemas de Informação' })
+  await expect(row).toBeVisible()
+  page.once('dialog', dialog => dialog.accept())
+  await row.getByRole('button', { name: 'Desativar' }).click()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('combobox', { name: 'Situação', exact: true }).selectOption('inactive')
+  await expect(row).toBeVisible()
+  await page.getByRole('link', { name: 'Disciplinas', exact: true }).click()
+  await expect(page.getByText('Maria Silva')).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('disciplinas.png'), fullPage: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.goto('/admin/campanhas/cpa-2026/formularios/geral/versoes/1')
+  await expect(page.getByRole('heading', { name: 'Versão 1' })).toBeVisible()
+  await expect(page.getByLabel('Texto')).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Salvar rascunho' })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('versao-publicada.png'), fullPage: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await expect(page).toHaveURL('http://127.0.0.1:5194/')
+})
+
+test('bloqueia usuário sem perfil administrativo', async ({ page }) => {
+  await mockServices(page, 'participante')
+  await page.goto('/admin/disciplinas')
+  await expect(page.getByRole('heading', { name: 'Acesso negado' })).toBeVisible()
+  await expect(page.getByText('Maria Silva')).toHaveCount(0)
+})
+
+test('exige salvar alterações antes de publicar um rascunho', async ({ page }) => {
+  await mockServices(page, 'cpa-admin', 'RASCUNHO')
+  await page.goto('/admin/campanhas/cpa-2026/formularios/geral/versoes/1')
+  const publish = page.getByRole('button', { name: 'Publicar versão salva' })
+  await expect(publish).toBeEnabled()
+  await page.getByRole('textbox', { name: 'Texto', exact: true }).fill('Pergunta atualizada')
+  await expect(publish).toBeDisabled()
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name: 'Salvar rascunho' }).click()
+  await expect(publish).toBeEnabled()
+  page.once('dialog', dialog => dialog.accept())
+  await publish.click()
+  await expect(page.getByRole('textbox', { name: 'Texto', exact: true })).toBeDisabled()
+  await expect(page.getByRole('textbox', { name: 'Texto', exact: true })).toHaveValue('Pergunta atualizada')
+})

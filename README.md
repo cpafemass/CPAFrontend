@@ -29,6 +29,50 @@ docker compose up -d --build
 
 O `VITE_API_BASE_URL` é definido durante o build da imagem; reconstrua o container após alterá-lo.
 
+## Painel administrativo
+
+Acesse `/admin`. O login usa o Keycloak e exige o papel de realm `cpa-admin`.
+A pesquisa pública não inicializa a autenticação. Os tokens ficam apenas em memória;
+as requisições administrativas renovam o token e enviam `Authorization: Bearer`.
+
+Configure antes de iniciar o Vite ou construir a imagem:
+
+```env
+VITE_KEYCLOAK_URL=http://localhost:8180
+VITE_KEYCLOAK_REALM=cpa
+VITE_KEYCLOAK_CLIENT_ID=cpa-frontend
+```
+
+`VITE_KEYCLOAK_URL` é a URL pública acessível pelo navegador, sem `/realms/cpa`.
+Não use o hostname interno do Docker. As variáveis `VITE_` são públicas e não devem
+conter segredos. Reconstrua a imagem após alterar a configuração.
+
+No Keycloak, configure um cliente público OpenID Connect `cpa-frontend`, com
+Standard Flow habilitado, PKCE S256 obrigatório e Direct Access Grants desabilitado.
+Cadastre a origem exata do frontend, redirecionamentos `/admin` e `/admin/*`, e
+retorno de logout `/`. Adicione um mapper de audiência `cpa-backend` ao access token
+e atribua `cpa-admin` aos usuários da comissão. Veja também as instruções de realm
+existente no README do backend.
+
+O painel oferece campanhas, cursos, disciplinas e formulários versionados.
+Desativar mantém o registro; um pai inativo oculta seus filhos da pesquisa sem
+alterar a ativação individual deles. Versões publicadas são somente para leitura:
+clone a versão mais recente para editar um novo rascunho. Salve o rascunho antes
+de publicar; alterações de conteúdo retornam a campanha ao estado de rascunho.
+
+Para validar:
+
+```bash
+npm test
+npm run lint
+npm run build
+npm run test:e2e
+```
+
+Os testes de navegador usam um provedor OIDC e uma API simulados, sem acessar os
+cadastros reais. Executam no Microsoft Edge instalado e verificam desktop e celular.
+Para usar outro navegador instalado, defina `PLAYWRIGHT_CHANNEL` (por exemplo, `chrome`).
+
 ## Comprovante com QR Code
 
 Após enviar a avaliação, a tela do comprovante exibe o QR Code e o identificador
