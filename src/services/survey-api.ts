@@ -13,11 +13,13 @@ interface ApiSubmitResponse {
   hash?: string
   qrCode?: string
   qrcode?: string
+  codigoDigestFinal?: string
 }
 
 export interface SubmitSurveyProof {
   kind: 'text' | 'qr'
   value: string
+  codigoDigestFinal?: string
 }
 
 export interface SubmitSurveyResult {
@@ -43,7 +45,16 @@ function normalizedProof(
 ): SubmitSurveyProof | undefined {
   if (!responseBody) return undefined
   const qrCode = (responseBody.qrCode ?? responseBody.qrcode)?.trim()
-  if (qrCode) return { kind: 'qr', value: qrCode }
+  if (qrCode) {
+    const codigoDigestFinal = responseBody.codigoDigestFinal?.trim()
+    return {
+      kind: 'qr',
+      value: qrCode,
+      ...(codigoDigestFinal && /^[0-9a-f]{10}$/i.test(codigoDigestFinal)
+        ? { codigoDigestFinal }
+        : {}),
+    }
+  }
   const token = (
     responseBody.receipt ??
     responseBody.comprovante ??

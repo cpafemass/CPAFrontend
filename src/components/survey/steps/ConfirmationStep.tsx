@@ -44,6 +44,14 @@ export function ConfirmationStep({
             {submitResult.proof.kind === "qr" ? (
               <div className="grid place-items-center">
                 <QRCodeImage value={submitResult.proof.value} />
+                {submitResult.proof.codigoDigestFinal ? (
+                  <p className="mt-3 text-sm text-slate-600">
+                    Identificador:{" "}
+                    <code className="font-bold text-slate-950">
+                      {submitResult.proof.codigoDigestFinal}
+                    </code>
+                  </p>
+                ) : null}
               </div>
             ) : (
               <code className="block break-all rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">

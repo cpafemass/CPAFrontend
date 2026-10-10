@@ -16,6 +16,26 @@ afterEach(() => {
 })
 
 describe('submitSurvey', () => {
+  it('preserves the digest suffix beside the original QR content', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      qrCode: 'opaque-qr-code',
+      codigoDigestFinal: '000000abcf',
+    }), { status: 200 })))
+
+    await expect(submitSurvey(payload)).resolves.toMatchObject({
+      proof: { kind: 'qr', value: 'opaque-qr-code', codigoDigestFinal: '000000abcf' },
+    })
+  })
+
+  it.each(['a'.repeat(64), 'invalid', '123456789'])('does not expose an invalid or full digest: %s', async (codigoDigestFinal) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      qrCode: 'opaque-qr-code', codigoDigestFinal,
+    }), { status: 200 })))
+
+    const result = await submitSurvey(payload)
+    expect(result.proof).toEqual({ kind: 'qr', value: 'opaque-qr-code' })
+  })
+
   it('posts an anonymous response exactly once', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)

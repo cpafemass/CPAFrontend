@@ -29,6 +29,15 @@ docker compose up -d --build
 
 O `VITE_API_BASE_URL` é definido durante o build da imagem; reconstrua o container após alterá-lo.
 
+## Comprovante com QR Code
+
+Após enviar a avaliação, a tela do comprovante exibe o QR Code e o identificador
+`codigoDigestFinal` retornado por `POST /formulario`: os 10 últimos caracteres do
+digest armazenado pelo backend. Esse identificador corresponde ao exibido pelo
+CPAValidador e pelo histórico. O conteúdo do QR Code continua sendo o código opaco
+original, utilizado para validar a participação. Se a API não retornar o identificador,
+o comprovante continua exibindo o QR Code.
+
 ## Scripts
 
 ```bash
