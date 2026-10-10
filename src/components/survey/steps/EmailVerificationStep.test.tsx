@@ -19,7 +19,7 @@ describe('EmailVerificationStep', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('sem matrícula antes do @')
+    expect(screen.getByRole('alert').textContent).toContain('sem matrícula antes do @')
     expect(onSubmit).not.toHaveBeenCalled()
   })
 

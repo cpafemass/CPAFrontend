@@ -175,7 +175,7 @@ describe('SurveyForm', () => {
       ok: true,
       status: 200,
       message: 'Avaliação enviada com sucesso.',
-      proof: { kind: 'qr', value: receipt },
+      proof: { kind: 'qr', value: receipt, codigoDigestFinal: '000000abcf' },
     })
 
     render(<SurveyForm />)
@@ -188,6 +188,7 @@ describe('SurveyForm', () => {
     await screen.findByRole('heading', { name: 'Avaliação enviada' })
     expect(screen.getByText('Comprovante')).not.toBeNull()
     expect(screen.getByRole('img', { name: 'QR Code de confirmação da participação' })).not.toBeNull()
+    expect(screen.getByText('000000abcf')).not.toBeNull()
     expect(screen.queryByText(receipt)).toBeNull()
     expect(window.location.href).not.toContain(receipt)
     expect(JSON.stringify(consoleLog.mock.calls)).not.toContain(receipt)
